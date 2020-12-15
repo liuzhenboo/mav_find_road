@@ -1,10 +1,6 @@
 
 <launch>  
-  <!--Astar server-->
-<!-- 
-  <include file="$(find rtabmap_ros)/mylaunch/stereo_mapping.launch">
-</include> -->
-
+  
     <!-- <node name="tf2odom" pkg="ds_utils" type="tf2odom" output="screen"/> -->
   <!-- Obstacles_detection -->
 		<node pkg="mav_find_road" type="mav_find_roads" name="mav_find_roads" output="screen">
@@ -40,6 +36,6 @@
 			<param name="normalKSearch" type="int" value="50"/>		
 			<param name="maxGroundHeight" type="double" value="-0.5"/>		
   		</node>
-  <arg name="rviz_cfg"                default="$(find mav_find_road)/launch/mav_find_road.rviz" />
+  <arg name="rviz_cfg"                default="$(find obstacles_detection)/launch/mav_find_road.rviz" />
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(arg rviz_cfg)"/>
 </launch>

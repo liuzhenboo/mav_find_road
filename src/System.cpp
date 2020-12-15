@@ -1,0 +1,247 @@
+
+#include <System.h>
+
+System::System()
+{
+	std::string frameId_;
+	std::string mapFrameId_;
+	bool waitForTransform_;
+	tf::TransformListener *tfListener_;
+	bool mapFrameProjection_;
+	double pointcloud_x_ = 2.0;
+	double pointcloud_y_ = 10.0;
+	double pointcloud_zu_ = 1.0;
+	double pointcloud_zd_ = 2.0;
+}
+System::~System()
+{
+}
+void System::Init_parameter(ros::NodeHandle &nh)
+{
+
+	PC_Processor_.pc_init(nh);
+	tfListener_ = new tf::TransformListener();
+	nh.param("frame_id", frameId_, frameId_);
+	nh.param("map_frame_id", mapFrameId_, mapFrameId_);
+	nh.param("wait_for_transform", waitForTransform_, waitForTransform_);
+	nh.param("projMapFrame", mapFrameProjection_, mapFrameProjection_);
+	nh.param("pointcloud_x", pointcloud_x_, pointcloud_x_);
+	nh.param("pointcloud_y", pointcloud_y_, pointcloud_y_);
+	nh.param("pointcloud_zu", pointcloud_zu_, pointcloud_zu_);
+	nh.param("pointcloud_zd", pointcloud_zd_, pointcloud_zd_);
+	if (mapFrameProjection_ && mapFrameId_.empty())
+	{
+		ROS_ERROR("mav_find_road: Parameter mapFrameProjection is true but map_frame_id is not set!");
+	}
+	double a = 0.1;
+	float b = 0.2;
+	b = a;
+	std::cout << b << std::endl;
+	ROS_INFO("Starting...");
+
+	// 需要订阅点云数据
+	cloudSub_ = nh.subscribe<sensor_msgs::PointCloud2>("/camera/depth/color/points", 1, boost::bind(&System::callback, this, _1));
+
+	// 发布道路点云数据
+	groundPub_ = nh.advertise<sensor_msgs::PointCloud2>("ground", 1);
+	obstaclesPub_ = nh.advertise<sensor_msgs::PointCloud2>("obstacles", 1);
+	projObstaclesPub_ = nh.advertise<sensor_msgs::PointCloud2>("proj_obstacles", 1);
+
+	// 发布道路信息
+	//.......
+}
+
+void System::run()
+{
+	ros::Rate rate(10);
+	bool status = ros::ok();
+	while (status)
+	{
+		ros::spinOnce();
+		status = ros::ok();
+		rate.sleep();
+	}
+}
+void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
+{
+
+	ros::WallTime time = ros::WallTime::now();
+
+	if (groundPub_.getNumSubscribers() == 0 && obstaclesPub_.getNumSubscribers() == 0)
+	{
+		// 无人订阅,则不进行处理.
+		ROS_INFO("no one wants the results!");
+		return;
+	}
+
+	// tf树获得localTransform: 点云坐标系与机体系frameId(base_link)的坐标变换
+	Attitude localTransform = Attitude::getIdentity();
+	try
+	{
+		if (waitForTransform_)
+		{
+			if (!tfListener_->waitForTransform(frameId_, cloudMsg->header.frame_id, ros::Time(0), ros::Duration(3)))
+			{
+				ROS_ERROR("Could not get transform from %s to %s after 1 second!", frameId_.c_str(), cloudMsg->header.frame_id.c_str());
+				return;
+			}
+		}
+		tf::StampedTransform tmp;
+		tfListener_->lookupTransform(frameId_, cloudMsg->header.frame_id, ros::Time(0), tmp);
+		localTransform = Utils_transform::transformFromTF(tmp);
+	}
+	catch (tf::TransformException &ex)
+	{
+		ROS_ERROR("%s", ex.what());
+		return;
+	}
+
+	// // tf树获得pose: frameId(base_link)在mapFrameId中的姿态
+	Attitude pose = Attitude::getIdentity();
+	if (!mapFrameId_.empty())
+	{
+		try
+		{
+			if (waitForTransform_)
+			{
+				if (!tfListener_->waitForTransform(mapFrameId_, frameId_, ros::Time(0), ros::Duration(3)))
+				{
+					ROS_ERROR("Could not get transform from %s to %s after 1 second!", mapFrameId_.c_str(), frameId_.c_str());
+					return;
+				}
+			}
+			tf::StampedTransform tmp;
+			tfListener_->lookupTransform(mapFrameId_, frameId_, ros::Time(0), tmp);
+			pose = Utils_transform::transformFromTF(tmp);
+		}
+		catch (tf::TransformException &ex)
+		{
+			ROS_ERROR("%s", ex.what());
+			return;
+		}
+	}
+
+	// 去除无效点云数据
+	pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud0(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::fromROSMsg(*cloudMsg, *inputCloud0);
+	if (inputCloud0->isOrganized())
+	{
+		std::vector<int> indices;
+		pcl::removeNaNFromPointCloud(*inputCloud0, *inputCloud0, indices);
+	}
+	pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZ>);
+
+	///  保留想要范围内的点云
+	for (int i = 0; i < inputCloud0->points.size(); i++)
+	{
+		pcl::PointXYZ pt;
+		pt = inputCloud0->points[i];
+		if (pt.x < pointcloud_x_ && pt.y < pointcloud_y_ && pt.y > -1.0 * pointcloud_y_ && pt.z > -1.0 * pointcloud_zd_ && pt.z < 1.0 * pointcloud_zu_)
+			inputCloud->points.push_back(pt);
+	}
+	inputCloud->width = inputCloud->points.size();
+	inputCloud->height = 1;
+	inputCloud->is_dense = true;
+
+	// 主要的点云变量
+	pcl::IndicesPtr ground, obstacles;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr obstaclesCloudWithoutFlatSurfaces(new pcl::PointCloud<pcl::PointXYZ>);
+
+	// 核心逻辑,对inputCloud进行处理
+	if (inputCloud->size())
+	{
+		// 转换到base_link坐标系
+		inputCloud = Utils_transform::transformPointCloud(inputCloud, localTransform);
+
+		pcl::IndicesPtr flatObstacles(new std::vector<int>);
+
+		// 点云分割
+		// ground为道路点云
+		// obstacles为影响行军的障碍物点云
+		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = PC_Processor_.segmentCloud(
+			inputCloud,
+			pcl::IndicesPtr(new std::vector<int>),
+			pose,
+			cv::Point3f(localTransform.x(), localTransform.y(), localTransform.z()),
+			ground,
+			obstacles,
+			&flatObstacles);
+
+		// ground与obstacles必须有一个不为空
+		if (cloud->size() && ((ground.get() && ground->size()) || (obstacles.get() && obstacles->size())))
+		{
+			// 对道路点云索引处理
+			// 从索引ground得到道路真实数据groundCloud
+			if (groundPub_.getNumSubscribers() &&
+				ground.get() && ground->size())
+			{
+				pcl::copyPointCloud(*cloud, *ground, *groundCloud);
+			}
+
+			// 对障碍物点云索引处理
+			if (obstaclesPub_.getNumSubscribers() || obstacles.get() && obstacles->size())
+			{
+				obstaclesCloud->resize(obstacles->size());
+				for (unsigned int i = 0; i < obstacles->size(); ++i)
+				{
+					obstaclesCloud->points[i] = cloud->at(obstacles->at(i));
+				}
+			}
+
+			if (!localTransform.isIdentity() || !pose.isIdentity())
+			{
+				//transform back in topic frame for 3d clouds and base frame for 2d clouds
+				// 在分割的函数中对点云做了一些坐标变换,这里恢复原来的坐标
+				float roll, pitch, yaw;
+				pose.getEulerAngles(roll, pitch, yaw);
+				Attitude t = Attitude(0, 0, mapFrameProjection_ ? pose.z() : 0, roll, pitch, 0);
+
+				if (groundCloud->size())
+				{
+					groundCloud = Utils_transform::transformPointCloud(groundCloud, t.inverse());
+					Attitude t1 = Attitude(pose.x(), pose.y(), pose.z(), roll, pitch, yaw);
+					groundCloud = Utils_transform::transformPointCloud(groundCloud, t1);
+					// 	groundCloud = rtabmap::util3d::transformPointCloud(groundCloud, t);
+				}
+				t = (t * localTransform).inverse();
+
+				if (obstaclesCloud->size())
+				{
+					obstaclesCloud = Utils_transform::transformPointCloud(obstaclesCloud, t);
+				}
+			}
+		}
+		else
+		{
+			ROS_INFO("no ground pointcloud and obstacles pointcloud!");
+		}
+	}
+	else
+	{
+		ROS_WARN("mav_find_road: Input cloud is empty! (%d x %d, is_dense=%d)", cloudMsg->width, cloudMsg->height, cloudMsg->is_dense ? 1 : 0);
+	}
+
+	if (groundPub_.getNumSubscribers())
+	{
+		sensor_msgs::PointCloud2 rosCloud;
+		pcl::toROSMsg(*groundCloud, rosCloud);
+		//rosCloud.header = cloudMsg->header;
+		rosCloud.header.stamp = cloudMsg->header.stamp;
+		rosCloud.header.frame_id = mapFrameId_;
+		//publish the message
+		groundPub_.publish(rosCloud);
+	}
+
+	if (obstaclesPub_.getNumSubscribers())
+	{
+		sensor_msgs::PointCloud2 rosCloud;
+		pcl::toROSMsg(*obstaclesCloud, rosCloud);
+		rosCloud.header = cloudMsg->header;
+
+		//publish the message
+		obstaclesPub_.publish(rosCloud);
+	}
+	ROS_DEBUG("road detect cost = %f s", (ros::WallTime::now() - time).toSec());
+}

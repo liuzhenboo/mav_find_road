@@ -1,45 +1,24 @@
 
 
 #include <ros/ros.h>
-#include <pluginlib/class_list_macros.h>
-#include <nodelet/nodelet.h>
-#include <ros/console.h>
-
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/filters/filter.h>
-
-#include <tf/transform_listener.h>
-
-#include <sensor_msgs/PointCloud2.h>
-#include <rtabmap/core/util3d.h>
-#include <rtabmap/core/util3d_mapping.h>
-#include <rtabmap/core/util3d_transforms.h>
-#include <rtabmap/core/util3d_filtering.h>
-#include <rtabmap/core/Compression.h>
-#include <rtabmap/utilite/UStl.h>
-#include <rtabmap/utilite/ULogger.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <eigen_conversions/eigen_msg.h>
-#include <tf_conversions/tf_eigen.h>
-#include <rtabmap/core/util3d_surface.h>
-#include <geometry_msgs/Transform.h>
-
-#include "rtabmap/core/OccupancyGrid.h"
-#include "rtabmap/utilite/UStl.h"
-#include <boost/mpl/bind.hpp>
 #include <iostream>
-using namespace rtabmap;
-class PointCloud_Processor
+
+#include <pcl/common/common.h>
+#include <pcl/common/centroid.h>
+#include <pcl/common/io.h>
+
+#include <Utils_pcl.h>
+#include <Utils_transform.h>
+
+class PC_Segment
 {
 public:
-	PointCloud_Processor(/* args */);
-	~PointCloud_Processor();
+	PC_Segment(/* args */);
+	~PC_Segment();
 	pcl::PointCloud<pcl::PointXYZ>::Ptr segmentCloud(
 		const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn,
 		const pcl::IndicesPtr &indicesIn,
-		const Transform &pose,
+		const Attitude &pose,
 		const cv::Point3f &viewPoint,
 		pcl::IndicesPtr &groundIndices,
 		pcl::IndicesPtr &obstaclesIndices,
@@ -59,8 +38,10 @@ public:
 		pcl::IndicesPtr *flatObstacles,
 		const Eigen::Vector4f &viewPoint);
 
-	void pc_init();
+	void pc_init(ros::NodeHandle &nh);
 	void double2float();
+
+private:
 	bool preVoxelFiltering_ = true;
 	bool projMapFrame_ = false;
 

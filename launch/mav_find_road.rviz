@@ -22,7 +22,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: Image
+    SyncSource: PointCloud2
   - Class: rviz/Tool Properties
     Expanded:
       - /2D Pose Estimate1
@@ -59,41 +59,29 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        camera_aligned_depth_to_color_frame:
-          Value: true
-        camera_aligned_depth_to_infra_frame:
-          Value: true
-        camera_color_frame:
-          Value: true
-        camera_color_optical_frame:
-          Value: true
-        camera_depth_frame:
-          Value: true
-        camera_depth_optical_frame:
-          Value: true
-        camera_infra_frame:
-          Value: true
-        camera_infra_optical_frame:
-          Value: true
-        camera_link:
+        base_link:
           Value: true
         map:
           Value: true
-        t265_aligned_depth_to_fisheye1_frame:
+        odom:
           Value: true
-        t265_fisheye1_frame:
+        zed2_baro_link:
           Value: true
-        t265_fisheye1_optical_frame:
+        zed2_camera_center:
           Value: true
-        t265_fisheye2_frame:
+        zed2_left_camera_frame:
           Value: true
-        t265_fisheye2_optical_frame:
+        zed2_left_camera_optical_frame:
           Value: true
-        t265_link:
+        zed2_mag_link:
           Value: true
-        t265_odom_frame:
+        zed2_right_camera_frame:
           Value: true
-        t265_pose_frame:
+        zed2_right_camera_optical_frame:
+          Value: true
+        zed2_temp_left_link:
+          Value: true
+        zed2_temp_right_link:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -102,30 +90,22 @@ Visualization Manager:
       Show Names: true
       Tree:
         map:
-          t265_odom_frame:
-            t265_pose_frame:
-              camera_link:
-                camera_aligned_depth_to_color_frame:
-                  camera_color_optical_frame:
-                    {}
-                camera_aligned_depth_to_infra_frame:
-                  camera_infra_optical_frame:
-                    {}
-                camera_color_frame:
+          odom:
+            base_link:
+              zed2_camera_center:
+                zed2_baro_link:
                   {}
-                camera_depth_frame:
-                  camera_depth_optical_frame:
+                zed2_left_camera_frame:
+                  zed2_left_camera_optical_frame:
                     {}
-                camera_infra_frame:
-                  {}
-              t265_link:
-                t265_aligned_depth_to_fisheye1_frame:
-                  t265_fisheye1_optical_frame:
+                  zed2_temp_left_link:
                     {}
-                t265_fisheye1_frame:
+                zed2_mag_link:
                   {}
-                t265_fisheye2_frame:
-                  t265_fisheye2_optical_frame:
+                zed2_right_camera_frame:
+                  zed2_right_camera_optical_frame:
+                    {}
+                  zed2_temp_right_link:
                     {}
       Update Interval: 0
       Value: true
@@ -331,8 +311,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 0.10000000149011612
-        Min Value: 0.10000000149011612
+        Max Value: -0.13967102766036987
+        Min Value: -1.3807380199432373
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -353,7 +333,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.20000000298023224
       Style: Boxes
-      Topic: /astar/grid_map_vis
+      Topic: /mav_find_roads/ground
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -370,7 +350,7 @@ Visualization Manager:
       Marker Topic: /astar/simple_grid_path_vis
       Name: Marker
       Namespaces:
-        demo_node/astar_path: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -378,7 +358,7 @@ Visualization Manager:
       Marker Topic: /astar/grid_path_vis
       Name: Marker
       Namespaces:
-        demo_node/astar_path: true
+        {}
       Queue Size: 100
       Value: true
   Enabled: true
@@ -405,25 +385,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 24.965974807739258
+      Distance: 50.777626037597656
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 5.833899021148682
-        Y: -4.704510688781738
-        Z: -3.5104074478149414
+        X: 27.788646697998047
+        Y: 3.2753353118896484
+        Z: 0.632766604423523
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.2197970151901245
+      Pitch: 0.8947984576225281
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.178555965423584
+      Yaw: 0.9435391426086426
     Saved: ~
 Window Geometry:
   Displays:

@@ -1,28 +1,9 @@
 
 <launch>  
-  <!--Astar server-->
-    <!-- <include file="$(find astar)/launch/astar.launch">
-          <arg name="map_size_x" value="100.0"/>
-          <arg name="map_size_y" value="100.0"/>
-          <arg name="map_size_z" value=" 0.2"/>
-          <arg name="margin" value=" 0.0"/>
-          <arg name="resolution" value=" 0.2"/>
-          <arg name="inflate_num" value=" 1"/>
-          <arg name="inflate_num_con_obs" value=" 5"/>
-          <arg name="start_x" value=" 0.0"/>
-          <arg name="start_y" value=" 0.0"/>
-          <arg name="start_z" value=" 0.1"/>
-          <arg name="odom" value="/t265/odom/sample"/>
-          <arg name="obstacles_map" default="/obstacles_detection1/proj_obstacles"/>
-          <arg name="pose" value="/global_pose"/>
-          <arg name="goal" value="/planner_goal"/>
-          <arg name="map_frameID" value="t265_odom_frame"/>
-          <arg name="use_localmap" value="true"/>
-     </include> -->
 
   <!-- Obstacles_detection -->
 	<!-- <group ns="/rgbd_camera" >		 -->
-		<node pkg="obstacles_detection" type="obstacles_detection1" name="obstacles_detection1" output="screen">
+		<node pkg="mav_find_road" type="mav_find_roads" name="mav_find_roads" output="screen">
     	<!-- <remap from="cloud" to="/camera/depth/color/points"/> -->
 			<!-- <remap from="obstacles" to="/planner_cloud"/> -->
 
