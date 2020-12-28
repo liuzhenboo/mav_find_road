@@ -19,23 +19,25 @@
 
 #include <Attitude.h>
 
+// pcl库接口
 namespace Utils_pcl
 {
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr voxelize(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr voxelize(
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     float voxelSize);
 
 pcl::IndicesPtr extractIndices(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     bool negative);
 
 pcl::IndicesPtr concatenate(const pcl::IndicesPtr &indicesA, const pcl::IndicesPtr &indicesB);
+pcl::IndicesPtr concatenate(const std::vector<pcl::IndicesPtr> &indices);
 
 std::vector<pcl::IndicesPtr> extractClusters(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     float clusterTolerance,
     int minClusterSize,
@@ -43,7 +45,7 @@ std::vector<pcl::IndicesPtr> extractClusters(
     int *biggestClusterIndex = 0);
 
 pcl::IndicesPtr normalFiltering(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     float angleMax,
     const Eigen::Vector4f &normal,
@@ -51,13 +53,13 @@ pcl::IndicesPtr normalFiltering(
     const Eigen::Vector4f &viewpoint);
 
 pcl::IndicesPtr radiusFiltering(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     float radiusSearch,
     int minNeighborsInRadius);
 
 pcl::IndicesPtr cropBox(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     const Eigen::Vector4f &min,
     const Eigen::Vector4f &max,
@@ -65,7 +67,7 @@ pcl::IndicesPtr cropBox(
     bool negative);
 
 pcl::IndicesPtr passThrough(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     const std::string &axis,
     float min,

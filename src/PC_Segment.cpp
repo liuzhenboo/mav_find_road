@@ -48,6 +48,10 @@ void PC_Segment::pc_init(ros::NodeHandle &nh)
 	nh.param("clusterRadius", clusterRadius, clusterRadius);
 	nh.param("noiseFilteringRadius", noiseFilteringRadius, noiseFilteringRadius);
 	nh.param("maxObstacleHeight", maxObstacleHeight, maxObstacleHeight);
+
+	// new parameter
+	nh.param("min_region", _min_region, _min_region);
+
 	double2float();
 }
 void PC_Segment::double2float()
@@ -67,8 +71,8 @@ void PC_Segment::double2float()
 // ********************************************************************************
 //点云分割接口
 //*********************************************************************************
-pcl::PointCloud<pcl::PointXYZ>::Ptr PC_Segment::segmentCloud(
-	const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn,
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr PC_Segment::segmentCloud(
+	const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloudIn,
 	const pcl::IndicesPtr &indicesIn,
 	const Attitude &pose,
 	const cv::Point3f &viewPoint,
@@ -83,7 +87,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PC_Segment::segmentCloud(
 		flatObstacles->reset(new std::vector<int>);
 	}
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 	pcl::IndicesPtr indices(new std::vector<int>);
 
 	if (preVoxelFiltering_)
@@ -225,7 +229,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PC_Segment::segmentCloud(
 
 //*********************************************************************************
 void PC_Segment::segmentObstaclesFromGround(
-	const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+	const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
 	const pcl::IndicesPtr &indices,
 	pcl::IndicesPtr &ground,
 	pcl::IndicesPtr &obstacles,
@@ -270,26 +274,43 @@ void PC_Segment::segmentObstaclesFromGround(
 			// cluster all surfaces for which the centroid is in the Z-range of the bigger surface
 			if (clusteredFlatSurfaces.size())
 			{
-				ground = clusteredFlatSurfaces.at(biggestFlatSurfaceIndex);
+
 				Eigen::Vector4f min, max;
 				pcl::getMinMax3D(*cloud, *clusteredFlatSurfaces.at(biggestFlatSurfaceIndex), min, max);
 
-				if (maxGroundHeight == 0.0f || min[2] < maxGroundHeight)
-				//if (false)
+				//TODO:道路一致性判断，建模概率模型，判断它是路的概率是多少．和语义ＳＬＡＭ的数据关联相似，计算关联上的概率．
+
+				// 道路面积判断
+				if ((max[0] - min[0]) * (max[1] - min[1]) > _min_region)
 				{
-					for (unsigned int i = 0; i < clusteredFlatSurfaces.size(); ++i)
+					ground = clusteredFlatSurfaces.at(biggestFlatSurfaceIndex);
+					std::cout << "道路面积为:" << (max[0] - min[0]) * (max[1] - min[1]) << "m*m" << std::endl;
+				}
+				else
+				{
+					/* code */
+					std::cout << "道路面积为:" << (max[0] - min[0]) * (max[1] - min[1]) << "m*m,小于" << _min_region << "m*m,舍去!" << std::endl;
+				}
+
+				if (maxGroundHeight == 0.0f || min[2] < maxGroundHeight)
+				{
+					// 是否只要最大的聚类平面．
+					if (false)
 					{
-						if ((int)i != biggestFlatSurfaceIndex)
+						for (unsigned int i = 0; i < clusteredFlatSurfaces.size(); ++i)
 						{
-							Eigen::Vector4f centroid(0, 0, 0, 1);
-							pcl::compute3DCentroid(*cloud, *clusteredFlatSurfaces.at(i), centroid);
-							if (maxGroundHeight == 0.0f || centroid[2] <= maxGroundHeight || centroid[2] <= max[2]) // epsilon
+							if ((int)i != biggestFlatSurfaceIndex)
 							{
-								ground = Utils_pcl::concatenate(ground, clusteredFlatSurfaces.at(i));
-							}
-							else if (flatObstacles)
-							{
-								*flatObstacles = Utils_pcl::concatenate(*flatObstacles, clusteredFlatSurfaces.at(i));
+								Eigen::Vector4f centroid(0, 0, 0, 1);
+								pcl::compute3DCentroid(*cloud, *clusteredFlatSurfaces.at(i), centroid);
+								if (maxGroundHeight == 0.0f || centroid[2] <= maxGroundHeight || centroid[2] <= max[2]) // epsilon
+								{
+									ground = Utils_pcl::concatenate(ground, clusteredFlatSurfaces.at(i));
+								}
+								else if (flatObstacles)
+								{
+									*flatObstacles = Utils_pcl::concatenate(*flatObstacles, clusteredFlatSurfaces.at(i));
+								}
 							}
 						}
 					}
@@ -316,9 +337,11 @@ void PC_Segment::segmentObstaclesFromGround(
 			pcl::IndicesPtr notObstacles = ground;
 			if (indices->size())
 			{
+				// indices是满足法线要求的点云索引
 				notObstacles = Utils_pcl::extractIndices(cloud, indices, true);
 				notObstacles = Utils_pcl::concatenate(notObstacles, ground);
 			}
+			// otherStuffIndices为去除地面之后的点云索引
 			pcl::IndicesPtr otherStuffIndices = Utils_pcl::extractIndices(cloud, notObstacles, true);
 
 			// If ground height is set, remove obstacles under it
@@ -330,15 +353,29 @@ void PC_Segment::segmentObstaclesFromGround(
 			//Cluster remaining stuff (obstacles)
 			if (otherStuffIndices->size())
 			{
+				std::vector<pcl::IndicesPtr> big_clusteredObstaclesSurfaces;
 				std::vector<pcl::IndicesPtr> clusteredObstaclesSurfaces = Utils_pcl::extractClusters(
 					cloud,
 					otherStuffIndices,
 					clusterRadius,
 					minClusterSize);
-
+				for (int k = 0; k < clusteredObstaclesSurfaces.size(); k++)
+				{
+					Eigen::Vector4f min, max;
+					pcl::getMinMax3D(*cloud, *clusteredObstaclesSurfaces.at(k), min, max);
+					// 	TODO:障碍物判断
+					if ((max[2] - min[2]) > 0.4)
+					{
+						big_clusteredObstaclesSurfaces.push_back(clusteredObstaclesSurfaces.at(k));
+					}
+				}
 				// merge indices
-				//obstacles = Utils_pcl::concatenate(clusteredObstaclesSurfaces);
+				obstacles = Utils_pcl::concatenate(big_clusteredObstaclesSurfaces);
 			}
 		}
+	}
+	else
+	{
+		std::cout << "有效点云为空！" << std::endl;
 	}
 }

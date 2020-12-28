@@ -69,6 +69,8 @@ src/Attitude.cpp
 src/System.cpp
 src/Utils/Utils_pcl.cpp
 src/Utils/Utils_transform.cpp
+src/Map.cpp
+src/Cell.cpp
 )
 target_link_libraries(${PROJECT_NAME}
 ${OpenCV_LIBRARIES}

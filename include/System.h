@@ -13,6 +13,7 @@
 #include <message_filters/synchronizer.h>
 #include <boost/mpl/bind.hpp>
 #include <PC_Segment.h>
+#include <Map.h>
 
 class System
 {
@@ -29,10 +30,12 @@ private:
 	bool waitForTransform_;
 	tf::TransformListener *tfListener_;
 	bool mapFrameProjection_;
-	double pointcloud_x_ = 2.0;
-	double pointcloud_y_ = 10.0;
-	double pointcloud_zu_ = 1.0;
-	double pointcloud_zd_ = 2.0;
+	double pointcloud_xu_ = 5.0;
+	double pointcloud_xd_ = -5.0;
+	double pointcloud_yu_ = 5.0;
+	double pointcloud_yd_ = -5.0;
+	double pointcloud_zu_ = 5.0;
+	double pointcloud_zd_ = -5.0;
 
 	ros::Publisher groundPub_;
 	ros::Publisher obstaclesPub_;
@@ -42,4 +45,6 @@ private:
 
 	// 点云切割器
 	PC_Segment PC_Processor_;
+
+	Map map_;
 };

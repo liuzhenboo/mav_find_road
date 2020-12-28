@@ -1,15 +1,15 @@
 #include <Utils_pcl.h>
 namespace Utils_pcl
 {
-pcl::PointCloud<pcl::PointXYZ>::Ptr voxelize(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr voxelize(
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     float voxelSize)
 {
-    pcl::PointCloud<pcl::PointXYZ>::Ptr output(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr output(new pcl::PointCloud<pcl::PointXYZRGB>);
     if ((cloud->is_dense && cloud->size()) || (!cloud->is_dense && indices->size()))
     {
-        pcl::VoxelGrid<pcl::PointXYZ> filter;
+        pcl::VoxelGrid<pcl::PointXYZRGB> filter;
         filter.setLeafSize(voxelSize, voxelSize, voxelSize);
         filter.setInputCloud(cloud);
         if (indices->size())
@@ -26,12 +26,12 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr voxelize(
 }
 
 pcl::IndicesPtr extractIndices(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     bool negative)
 {
     pcl::IndicesPtr output(new std::vector<int>);
-    pcl::ExtractIndices<pcl::PointXYZ> extract;
+    pcl::ExtractIndices<pcl::PointXYZRGB> extract;
     extract.setInputCloud(cloud);
     extract.setIndices(indices);
     extract.setNegative(negative);
@@ -50,17 +50,35 @@ pcl::IndicesPtr concatenate(const pcl::IndicesPtr &indicesA, const pcl::IndicesP
     }
     return ind;
 }
-
+pcl::IndicesPtr concatenate(const std::vector<pcl::IndicesPtr> &indices)
+{
+    //compute total size
+    unsigned int totalSize = 0;
+    for (unsigned int i = 0; i < indices.size(); ++i)
+    {
+        totalSize += (unsigned int)indices[i]->size();
+    }
+    pcl::IndicesPtr ind(new std::vector<int>(totalSize));
+    unsigned int io = 0;
+    for (unsigned int i = 0; i < indices.size(); ++i)
+    {
+        for (unsigned int j = 0; j < indices[i]->size(); ++j)
+        {
+            ind->at(io++) = indices[i]->at(j);
+        }
+    }
+    return ind;
+}
 std::vector<pcl::IndicesPtr> extractClusters(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     float clusterTolerance,
     int minClusterSize,
     int maxClusterSize,
     int *biggestClusterIndex)
 {
-    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>(true));
-    pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGB>(true));
+    pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
     // 设置聚类半径m
     ec.setClusterTolerance(clusterTolerance);
     //设置聚类需要的最小数目
@@ -106,7 +124,7 @@ std::vector<pcl::IndicesPtr> extractClusters(
 }
 
 pcl::IndicesPtr normalFiltering(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     float angleMax,
     const Eigen::Vector4f &normal,
@@ -117,9 +135,9 @@ pcl::IndicesPtr normalFiltering(
 
     if (cloud->size())
     {
-        pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>(false));
+        pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGB>(false));
 
-        pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::Normal> ne;
+        pcl::NormalEstimationOMP<pcl::PointXYZRGB, pcl::Normal> ne;
         ne.setInputCloud(cloud);
         if (indices->size())
         {
@@ -164,12 +182,12 @@ pcl::IndicesPtr normalFiltering(
 }
 
 pcl::IndicesPtr radiusFiltering(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     float radiusSearch,
     int minNeighborsInRadius)
 {
-    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>(false));
+    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGB>(false));
 
     if (indices->size())
     {
@@ -210,7 +228,7 @@ pcl::IndicesPtr radiusFiltering(
 }
 
 pcl::IndicesPtr cropBox(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     const Eigen::Vector4f &min,
     const Eigen::Vector4f &max,
@@ -220,7 +238,7 @@ pcl::IndicesPtr cropBox(
     // UASSERT(min[0] < max[0] && min[1] < max[1] && min[2] < max[2]);
 
     pcl::IndicesPtr output(new std::vector<int>);
-    pcl::CropBox<pcl::PointXYZ> filter;
+    pcl::CropBox<pcl::PointXYZRGB> filter;
     filter.setNegative(negative);
     filter.setMin(min);
     filter.setMax(max);
@@ -235,7 +253,7 @@ pcl::IndicesPtr cropBox(
 }
 
 pcl::IndicesPtr passThrough(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const pcl::IndicesPtr &indices,
     const std::string &axis,
     float min,
@@ -246,7 +264,7 @@ pcl::IndicesPtr passThrough(
     // UASSERT(axis.compare("x") == 0 || axis.compare("y") == 0 || axis.compare("z") == 0);
 
     pcl::IndicesPtr output(new std::vector<int>);
-    pcl::PassThrough<pcl::PointXYZ> filter;
+    pcl::PassThrough<pcl::PointXYZRGB> filter;
     filter.setNegative(negative);
     filter.setFilterFieldName(axis);
     filter.setFilterLimits(min, max);
@@ -256,4 +274,4 @@ pcl::IndicesPtr passThrough(
     return output;
 }
 
-}
+} // namespace Utils_pcl

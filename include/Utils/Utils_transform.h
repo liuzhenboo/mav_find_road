@@ -26,8 +26,8 @@
 namespace Utils_transform
 {
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr transformPointCloud(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformPointCloud(
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const Attitude &transform);
 Attitude transformFromTF(const tf::Transform &transform);
 

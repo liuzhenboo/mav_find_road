@@ -15,8 +15,8 @@ class PC_Segment
 public:
 	PC_Segment(/* args */);
 	~PC_Segment();
-	pcl::PointCloud<pcl::PointXYZ>::Ptr segmentCloud(
-		const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloudIn,
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr segmentCloud(
+		const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloudIn,
 		const pcl::IndicesPtr &indicesIn,
 		const Attitude &pose,
 		const cv::Point3f &viewPoint,
@@ -25,7 +25,7 @@ public:
 		pcl::IndicesPtr *flatObstacles);
 
 	void segmentObstaclesFromGround(
-		const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+		const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
 		const pcl::IndicesPtr &indices,
 		pcl::IndicesPtr &ground,
 		pcl::IndicesPtr &obstacles,
@@ -75,4 +75,7 @@ private:
 	double clusterRadius = 0.1;
 	double noiseFilteringRadius;
 	double maxGroundHeight = 0.0;
+
+	// new parameter
+	double _min_region = 2.0;
 };

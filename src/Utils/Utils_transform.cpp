@@ -2,11 +2,11 @@
 
 namespace Utils_transform
 {
-pcl::PointCloud<pcl::PointXYZ>::Ptr transformPointCloud(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud,
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformPointCloud(
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud,
     const Attitude &transform)
 {
-    pcl::PointCloud<pcl::PointXYZ>::Ptr output(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr output(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::transformPointCloud(*cloud, *output, transform.toEigen4f());
     return output;
 }
