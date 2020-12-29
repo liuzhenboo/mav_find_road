@@ -18,9 +18,9 @@ public:
 	bool fusion(pcl::PointCloud<pcl::PointXYZRGB>::Ptr current_pts);
 	bool fusion_obs(pcl::PointCloud<pcl::PointXYZRGB>::Ptr current_pts);
 	// 方格融合
-	bool fusion_cell(pcl::PointCloud<pcl::PointXYZRGB>::Ptr current_pts);
+	bool fusion_cell(pcl::PointCloud<pcl::PointXYZRGB>::Ptr current_pts, uint8_t class_id);
 
-	void addOnePoint(float x, float y, float z);
+	void addOnePoint(float x, float y, float z, uint8_t class_id);
 	pcl::PointCloud<pcl::PointXYZ>::Ptr get_cellMap();
 	int Corrd2Id(float x, float y, float z);
 	std::vector<float> Id2Corrd(int id);
@@ -33,6 +33,7 @@ private:
 	std::vector<Cell *> cellDataset_;
 	std::set<int> road_ids;
 	std::set<int> obs_ids;
+	std::set<int> unsure_ids;
 
 	double length = 30;
 	double width = 30;

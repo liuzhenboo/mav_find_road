@@ -9,9 +9,9 @@ Map::Map()
 
 	all_pc = temp;
 	all_pc_obs = temp1;
-	length = 30.0;
-	width = 30.0;
-	resolution = 0.2;
+	length = 100.0;
+	width = 100.0;
+	resolution = 0.1;
 }
 Map::~Map()
 {
@@ -37,45 +37,91 @@ bool Map::fusion_obs(pcl::PointCloud<pcl::PointXYZRGB>::Ptr current_pt)
 	return true;
 }
 
-bool Map::fusion_cell(pcl::PointCloud<pcl::PointXYZRGB>::Ptr current_pts)
+bool Map::fusion_cell(pcl::PointCloud<pcl::PointXYZRGB>::Ptr current_pts, uint8_t class_id)
 {
 	std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> data = current_pts->points;
 	for (unsigned int i = 0; i < data.size(); i++)
 	{
-		addOnePoint(data[i].x, data[i].y, data[i].z);
+		addOnePoint(data[i].x, data[i].y, data[i].z, class_id);
 	}
 	return true;
 }
 
 // 投射到格子iｄ号，更新状态量
-void Map::addOnePoint(float x, float y, float z)
+void Map::addOnePoint(float x, float y, float z, uint8_t class_id)
 {
 	int current_id = Corrd2Id(x, y, z);
 	// TODO get current_id...
-	std::cout << "ADD one point" << std::endl;
+	//std::cout << "ADD one point" << std::endl;
 	if (current_id < sum_size)
 	{ // 如果已经存在，那就融合高度；否则创建新的
-		std::cout << "current_id: " << current_id << std::endl;
-		std::cout << "sum_size: " << sum_size << std::endl;
+		//std::cout << "current_id: " << current_id << std::endl;
+		//std::cout << "sum_size: " << sum_size << std::endl;
 
+		// 此id之前对应道路分类，障碍物分类，或没有分类
 		if (road_ids.find(current_id) != road_ids.end())
 		{
-			std::cout << "ADD one point1" << std::endl;
+			//std::cout << "ADD one point1" << std::endl;
 
-			cellDataset_[current_id]->Update(1, z);
+			uint8_t fusion_classid = cellDataset_[current_id]->Update(class_id, z);
+			if (fusion_classid == 2)
+			{
+				road_ids.erase(current_id);
+				obs_ids.insert(current_id);
+			}
+			else if (fusion_classid == 0)
+			{
+				road_ids.erase(current_id);
+				delete cellDataset_[current_id];
+			}
+		}
+		else if (obs_ids.find(current_id) != obs_ids.end())
+		{
+			uint8_t fusion_classid = cellDataset_[current_id]->Update(class_id, z);
+			if (fusion_classid == 1)
+			{
+				obs_ids.erase(current_id);
+				road_ids.insert(current_id);
+			}
+			else if (fusion_classid == 0)
+			{
+				obs_ids.erase(current_id);
+				delete cellDataset_[current_id];
+			}
+		}
+		else if (unsure_ids.find(current_id) != unsure_ids.end())
+		{
+			uint8_t fusion_classid = cellDataset_[current_id]->Update(class_id, z);
+			if (fusion_classid == 1)
+			{
+				unsure_ids.erase(current_id);
+				road_ids.insert(current_id);
+			}
+			else if (fusion_classid == 2)
+			{
+				unsure_ids.erase(current_id);
+				obs_ids.insert(current_id);
+			}
+			else if (fusion_classid == 0)
+			{
+				unsure_ids.erase(current_id);
+				delete cellDataset_[current_id];
+			}
 		}
 		else
 		{
-			std::cout << "ADD one point2" << std::endl;
+			//std::cout << "ADD one point2" << std::endl;
 
-			cellDataset_[current_id] = new Cell(1, z);
-			road_ids.insert(current_id);
+			cellDataset_[current_id] = new Cell(class_id, z);
+			unsure_ids.insert(current_id);
 		}
 	}
 	else
 	{
 		std::cout << "超出地图！" << std::endl;
 	}
+	// debug
+	//std::cout << road_ids.size() << std::endl;
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_cellMap()

@@ -270,7 +270,7 @@ void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
 	ros::WallTime time1 = ros::WallTime::now();
 	// 融合当前道路点云
 	//map_.fusion(groundCloud);
-	map_.fusion_cell(groundCloud);
+	map_.fusion_cell(groundCloud, 1);
 	std::cout << "fusion_cell" << std::endl;
 	if (groundPub_.getNumSubscribers())
 	{
@@ -286,17 +286,17 @@ void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
 		//publish the message
 		groundPub_.publish(rosCloud);
 	}
-	// map_.fusion_obs(obstaclesCloud);
-	// if (obstaclesPub_.getNumSubscribers())
-	// {
-	// 	sensor_msgs::PointCloud2 rosCloud;
-	// 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr all_obsCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-	// 	all_obsCloud = map_.get_allObsmap();
-	// 	pcl::toROSMsg(*all_obsCloud, rosCloud);
-	// 	rosCloud.header.stamp = cloudMsg->header.stamp;
-	// 	rosCloud.header.frame_id = mapFrameId_;
-	// 	//publish the message
-	// 	obstaclesPub_.publish(rosCloud);
-	// }
+	map_.fusion_obs(obstaclesCloud);
+	if (obstaclesPub_.getNumSubscribers())
+	{
+		sensor_msgs::PointCloud2 rosCloud;
+		pcl::PointCloud<pcl::PointXYZRGB>::Ptr all_obsCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+		all_obsCloud = map_.get_allObsmap();
+		pcl::toROSMsg(*all_obsCloud, rosCloud);
+		rosCloud.header.stamp = cloudMsg->header.stamp;
+		rosCloud.header.frame_id = mapFrameId_;
+		//publish the message
+		obstaclesPub_.publish(rosCloud);
+	}
 	ROS_DEBUG("map fusion cost = %f s", (ros::WallTime::now() - time1).toSec());
 }
