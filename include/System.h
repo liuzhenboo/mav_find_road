@@ -23,6 +23,8 @@ public:
 	void callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg);
 	void Init_parameter(ros::NodeHandle &);
 	void run();
+	void vis_map();
+	void Sent2MapHandle(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud);
 
 private:
 	std::string frameId_;
@@ -37,7 +39,9 @@ private:
 	double pointcloud_zu_ = 5.0;
 	double pointcloud_zd_ = -5.0;
 
+	int system_status_;
 	ros::Publisher groundPub_;
+	ros::Publisher localgroundPub_;
 	ros::Publisher obstaclesPub_;
 	ros::Publisher projObstaclesPub_;
 
@@ -47,4 +51,7 @@ private:
 	PC_Segment PC_Processor_;
 
 	Map map_;
+
+	const sensor_msgs::PointCloud2ConstPtr cloudMsg_;
+	Attitude pose_;
 };

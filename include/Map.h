@@ -1,10 +1,24 @@
 #include <iostream>
 #include <ros/ros.h>
 #include <set>
+#include <Utils_transform.h>
+
 #include <pcl/common/common.h>
 #include <pcl/common/centroid.h>
 #include <pcl/common/io.h>
 #include <Cell.h>
+
+enum Color
+{
+	COLOR_BLACK,
+	COLOR_RED,
+	COLOR_BLUE,
+	COLOR_GREEN,
+	COLOR_WHITE,
+	COLOR_CYAN,
+	COLOR_YELLOW,
+	COLOR_MAGENTA,
+};
 class Map
 {
 public:
@@ -22,8 +36,19 @@ public:
 
 	void addOnePoint(float x, float y, float z, uint8_t class_id);
 	pcl::PointCloud<pcl::PointXYZ>::Ptr get_cellMap();
+	pcl::PointCloud<pcl::PointXYZ>::Ptr get_localMap();
+	pcl::PointCloud<pcl::PointXYZ>::Ptr get_ObscellMap();
 	int Corrd2Id(float x, float y, float z);
 	std::vector<float> Id2Corrd(int id);
+
+	int Initialization_Newground(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds);
+	int Track(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud);
+	int Init_Clouds2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, int Initializing);
+	int Init_Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds);
+	int Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds);
+	void Add2Globalmap();
+	void SetPose(Attitude pose);
+	void SetInitFlag(int flag);
 
 private:
 	// 点云　fusion
@@ -31,9 +56,21 @@ private:
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr all_pc_obs;
 	// 方格fusion
 	std::vector<Cell *> cellDataset_;
+
 	std::set<int> road_ids;
 	std::set<int> obs_ids;
 	std::set<int> unsure_ids;
+
+	// local map
+	std::map<int, Cell *> localmap_;
+	std::set<int> localnew_id_;
+	int InitializeFromScratch_;
+	std::map<int, int> cell_olds;
+	int current_old;
+	int localmap_size_;
+
+	// location
+	Attitude pose_;
 
 	double length = 30;
 	double width = 30;

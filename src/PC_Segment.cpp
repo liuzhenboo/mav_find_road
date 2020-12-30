@@ -284,31 +284,36 @@ void PC_Segment::segmentObstaclesFromGround(
 				if ((max[0] - min[0]) * (max[1] - min[1]) > _min_region)
 				{
 					ground = clusteredFlatSurfaces.at(biggestFlatSurfaceIndex);
-					std::cout << "道路面积为:" << (max[0] - min[0]) * (max[1] - min[1]) << "m*m" << std::endl;
+					std::cout << "当前主道路面积为:" << (max[0] - min[0]) * (max[1] - min[1]) << "m*m" << std::endl;
 				}
 				else
 				{
 					/* code */
-					std::cout << "道路面积为:" << (max[0] - min[0]) * (max[1] - min[1]) << "m*m,小于" << _min_region << "m*m,舍去!" << std::endl;
+					std::cout << "当前主道路面积为:" << (max[0] - min[0]) * (max[1] - min[1]) << "m*m,小于" << _min_region << "m*m,舍去!" << std::endl;
 				}
 
+				// if (maxGroundHeight == 0.0f || min[2] < maxGroundHeight)
 				if (maxGroundHeight == 0.0f || min[2] < maxGroundHeight)
 				{
 					// 是否只要最大的聚类平面．
-					if (false)
+					if (true)
 					{
 						for (unsigned int i = 0; i < clusteredFlatSurfaces.size(); ++i)
 						{
 							if ((int)i != biggestFlatSurfaceIndex)
 							{
-								Eigen::Vector4f centroid(0, 0, 0, 1);
-								pcl::compute3DCentroid(*cloud, *clusteredFlatSurfaces.at(i), centroid);
-								if (maxGroundHeight == 0.0f || centroid[2] <= maxGroundHeight || centroid[2] <= max[2]) // epsilon
+								Eigen::Vector4f min, max;
+								pcl::getMinMax3D(*cloud, *clusteredFlatSurfaces.at(i), min, max);
+								// Eigen::Vector4f centroid(0, 0, 0, 1);
+								// pcl::compute3DCentroid(*cloud, *clusteredFlatSurfaces.at(i), centroid);
+								// if (maxGroundHeight == 0.0f || centroid[2] <= maxGroundHeight || centroid[2] <= max[2]) // epsilon
+								if ((max[0] - min[0]) * (max[1] - min[1]) > _min_region && min[2] < maxGroundHeight)
 								{
 									ground = Utils_pcl::concatenate(ground, clusteredFlatSurfaces.at(i));
 								}
 								else if (flatObstacles)
 								{
+									// 平面障碍物
 									*flatObstacles = Utils_pcl::concatenate(*flatObstacles, clusteredFlatSurfaces.at(i));
 								}
 							}

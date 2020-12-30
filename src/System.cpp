@@ -16,6 +16,7 @@ System::System()
 
 	double pointcloud_zu_ = 5.0;
 	double pointcloud_zd_ = -5.0;
+	system_status_ = 0;
 }
 System::~System()
 {
@@ -26,6 +27,7 @@ void System::Init_parameter(ros::NodeHandle &nh)
 	PC_Processor_.pc_init(nh);
 	map_.init(nh);
 	tfListener_ = new tf::TransformListener();
+	mapFrameProjection_ = false;
 	nh.param("frame_id", frameId_, frameId_);
 	nh.param("map_frame_id", mapFrameId_, mapFrameId_);
 	nh.param("wait_for_transform", waitForTransform_, waitForTransform_);
@@ -51,6 +53,8 @@ void System::Init_parameter(ros::NodeHandle &nh)
 
 	// 发布道路点云数据
 	groundPub_ = nh.advertise<sensor_msgs::PointCloud2>("ground", 1);
+	localgroundPub_ = nh.advertise<sensor_msgs::PointCloud2>("localground", 1);
+
 	obstaclesPub_ = nh.advertise<sensor_msgs::PointCloud2>("obstacles", 1);
 	projObstaclesPub_ = nh.advertise<sensor_msgs::PointCloud2>("proj_obstacles", 1);
 
@@ -73,7 +77,6 @@ void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
 {
 
 	ros::WallTime time = ros::WallTime::now();
-
 	if (groundPub_.getNumSubscribers() == 0 && obstaclesPub_.getNumSubscribers() == 0)
 	{
 		// 无人订阅,则不进行处理.
@@ -120,6 +123,8 @@ void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
 			tf::StampedTransform tmp;
 			tfListener_->lookupTransform(mapFrameId_, frameId_, ros::Time(0), tmp);
 			pose = Utils_transform::transformFromTF(tmp);
+			pose_ = pose;
+			map_.SetPose(pose);
 		}
 		catch (tf::TransformException &ex)
 		{
@@ -142,6 +147,7 @@ void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloudWithoutFlatSurfaces(new pcl::PointCloud<pcl::PointXYZRGB>);
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr debug_pt(new pcl::PointCloud<pcl::PointXYZRGB>);
 
 	// 核心逻辑,对inputCloud进行处理
 	if (inputCloud0->size())
@@ -149,7 +155,7 @@ void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
 		// 转换到base_link坐标系,
 		inputCloud0 = Utils_transform::transformPointCloud(inputCloud0, localTransform);
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-
+		debug_pt = inputCloud;
 		///  保留想要范围内的点云
 		for (int i = 0; i < inputCloud0->points.size(); i++)
 		{
@@ -219,7 +225,7 @@ void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
 					groundCloud = Utils_transform::transformPointCloud(groundCloud, t.inverse());
 					Attitude t1 = Attitude(pose.x(), pose.y(), pose.z(), roll, pitch, yaw);
 					groundCloud = Utils_transform::transformPointCloud(groundCloud, t1);
-					// 	groundCloud = rtabmap::util3d::transformPointCloud(groundCloud, t);
+					//debug_pt = Utils_transform::transformPointCloud(debug_pt, t1);
 				}
 				//t = (t * localTransform).inverse();
 
@@ -266,37 +272,86 @@ void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
 	// 	obstaclesPub_.publish(rosCloud);
 	// }
 	ROS_DEBUG("road detect cost = %f s", (ros::WallTime::now() - time).toSec());
+	Sent2MapHandle(groundCloud);
+}
 
+void System::Sent2MapHandle(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud)
+{
 	ros::WallTime time1 = ros::WallTime::now();
 	// 融合当前道路点云
 	//map_.fusion(groundCloud);
-	map_.fusion_cell(groundCloud, 1);
-	std::cout << "fusion_cell" << std::endl;
+	// 初始化，丢失状态
+	if (system_status_ == 0)
+	{
+		system_status_ = map_.Initialization_Newground(groundCloud);
+		if (system_status_ == 1)
+		{
+			std::cout << "初始化成功！" << std::endl;
+		}
+		else
+		{
+			//std::cout << "正在初始化．．．"　<< std::endl;
+		}
+	}
+	// 初始化成功
+	else
+	{
+		// 跟踪成功
+		if (map_.Track(groundCloud))
+		{
+			map_.Fusion2Localmap(groundCloud);
+			map_.Add2Globalmap();
+			std::cout << "fusion_cell" << std::endl;
+			vis_map();
+		}
+		else
+		{
+			//std::cout << "跟踪失败！重新初始化！！"　<< std::endl;
+			system_status_ = 0;
+			map_.SetInitFlag(1);
+		}
+	}
+	ROS_DEBUG("map fusion cost = %f s", (ros::WallTime::now() - time1).toSec());
+}
+
+void System::vis_map()
+{
 	if (groundPub_.getNumSubscribers())
 	{
 		sensor_msgs::PointCloud2 rosCloud;
+		sensor_msgs::PointCloud2 roslocalCloud;
+
 		pcl::PointCloud<pcl::PointXYZ>::Ptr all_groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		pcl::PointCloud<pcl::PointXYZ>::Ptr local_groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
+
+		//pcl::PointCloud<pcl::PointXYZRGB>::Ptr all_groundCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+
 		//all_groundCloud = map_.get_allmap();
 		all_groundCloud = map_.get_cellMap();
+		local_groundCloud = map_.get_localMap();
 
 		pcl::toROSMsg(*all_groundCloud, rosCloud);
+		pcl::toROSMsg(*local_groundCloud, roslocalCloud);
+
 		//rosCloud.header = cloudMsg->header;
-		rosCloud.header.stamp = cloudMsg->header.stamp;
+		//rosCloud.header.stamp = cloudMsg_->header.stamp;
 		rosCloud.header.frame_id = mapFrameId_;
+		roslocalCloud.header.frame_id = mapFrameId_;
 		//publish the message
 		groundPub_.publish(rosCloud);
+		localgroundPub_.publish(roslocalCloud);
 	}
-	map_.fusion_obs(obstaclesCloud);
-	if (obstaclesPub_.getNumSubscribers())
-	{
-		sensor_msgs::PointCloud2 rosCloud;
-		pcl::PointCloud<pcl::PointXYZRGB>::Ptr all_obsCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-		all_obsCloud = map_.get_allObsmap();
-		pcl::toROSMsg(*all_obsCloud, rosCloud);
-		rosCloud.header.stamp = cloudMsg->header.stamp;
-		rosCloud.header.frame_id = mapFrameId_;
-		//publish the message
-		obstaclesPub_.publish(rosCloud);
-	}
-	ROS_DEBUG("map fusion cost = %f s", (ros::WallTime::now() - time1).toSec());
+	// map_.fusion_cell(obstaclesCloud, 2);
+
+	// if (obstaclesPub_.getNumSubscribers())
+	// {
+	// 	sensor_msgs::PointCloud2 rosCloud;
+	// 	pcl::PointCloud<pcl::PointXYZ>::Ptr all_obsCloud(new pcl::PointCloud<pcl::PointXYZ>);
+	// 	all_obsCloud = map_.get_ObscellMap();
+	// 	pcl::toROSMsg(*all_obsCloud, rosCloud);
+	// 	rosCloud.header.stamp = cloudMsg_->header.stamp;
+	// 	rosCloud.header.frame_id = mapFrameId_;
+	// 	//publish the message
+	// 	obstaclesPub_.publish(rosCloud);
+	// }
 }

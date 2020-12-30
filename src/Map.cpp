@@ -12,6 +12,9 @@ Map::Map()
 	length = 100.0;
 	width = 100.0;
 	resolution = 0.1;
+	InitializeFromScratch_ = 1;
+	current_old = 1;
+	localmap_size_ = 5000;
 }
 Map::~Map()
 {
@@ -28,6 +31,8 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr Map::get_allObsmap()
 bool Map::fusion(pcl::PointCloud<pcl::PointXYZRGB>::Ptr current_pt)
 {
 	*all_pc = *all_pc + *current_pt;
+	//*all_pc = *current_pt;
+
 	return true;
 }
 
@@ -121,7 +126,7 @@ void Map::addOnePoint(float x, float y, float z, uint8_t class_id)
 		std::cout << "超出地图！" << std::endl;
 	}
 	// debug
-	//std::cout << road_ids.size() << std::endl;
+	std::cout << obs_ids.size() << std::endl;
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_cellMap()
@@ -142,7 +147,24 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_cellMap()
 	}
 	return cloud_vis;
 }
+pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_ObscellMap()
+{
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_vis(new pcl::PointCloud<pcl::PointXYZ>);
+	std::set<int>::iterator iter = obs_ids.begin();
+	while (iter != obs_ids.end())
+	{
+		/* code */
+		std::vector<float> current_ground_point = Id2Corrd(*iter);
+		pcl::PointXYZ pt;
+		pt.x = current_ground_point[0];
+		pt.y = current_ground_point[1];
+		pt.z = current_ground_point[2];
 
+		cloud_vis->push_back(pt);
+		iter++;
+	}
+	return cloud_vis;
+}
 std::vector<float> Map::Id2Corrd(int id)
 {
 	std::vector<float> reasult;
@@ -170,4 +192,188 @@ void Map::init(ros::NodeHandle &nh)
 
 	rd_x = -1.0 * origin_id_x * resolution;
 	rd_y = -1.0 * origin_id_y * resolution;
+
+	nh.param("localmap_size", localmap_size_, localmap_size_);
+}
+int Map::Initialization_Newground(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds)
+{
+	// 已经开始初始化,初始化正在进行时．．．
+	if (!InitializeFromScratch_)
+	{
+		// fusion localmap
+		return Init_Clouds2Localmap(clouds, InitializeFromScratch_);
+	}
+	else
+	// 正在开始初始化
+	{
+		// clean localmap,start new ...
+		localmap_.clear();
+		localnew_id_.clear();
+		return Init_Clouds2Localmap(clouds, InitializeFromScratch_);
+	}
+}
+int Map::Track(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud)
+{
+	int id = Corrd2Id(pose_.x(), pose_.y(), pose_.z());
+	if (obs_ids.find(id) != obs_ids.end())
+	{
+		return 0;
+	}
+
+	return 1;
+	// 跟踪方法：计算匹配的总体效果（计算匹配上的每一个cell的高度差，计算平均高度差，高度差要小于阈值）
+
+	std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> data = groundCloud->points;
+	for (unsigned int i = 0; i < data.size(); i++)
+	{
+		int current_id = Corrd2Id(data[i].x, data[i].y, data[i].z);
+		if (localmap_.find(current_id) != localmap_.end())
+		{
+			localmap_[current_id]->Update(1, data[i].z);
+		}
+		else
+		{
+			localmap_[current_id] = new Cell(1, data[i].z);
+			localnew_id_.insert(current_id);
+		}
+		//AddOnePoint2Localmap(data[i].x, data[i].y, data[i].z);
+	}
+	return 0;
+}
+int Map::Init_Clouds2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, int InitializeFromScratch)
+{
+	if (InitializeFromScratch)
+	{
+		std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> data = clouds->points;
+		for (unsigned int i = 0; i < data.size(); i++)
+		{
+			int current_id = Corrd2Id(data[i].x, data[i].y, data[i].z);
+			localmap_[current_id] = new Cell(1, data[i].z);
+			//AddOnePoint2Localmap(data[i].x, data[i].y, data[i].z);
+		}
+		InitializeFromScratch_ = 0;
+		return 0;
+	}
+	else
+	{
+		int flag = Init_Fusion2Localmap(clouds);
+		if (flag == 0) //初始化失败
+		{
+			InitializeFromScratch_ = 1;
+			return 0;
+		}
+		else if (flag == 1)
+			// 正在初始化还未完成
+			return 0;
+		else
+			//初始化成功
+			return 1;
+	}
+}
+int Map::Init_Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds)
+{
+	// TODO...
+	std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> data = clouds->points;
+	for (unsigned int i = 0; i < data.size(); i++)
+	{
+		int current_id = Corrd2Id(data[i].x, data[i].y, data[i].z);
+		if (localmap_.find(current_id) != localmap_.end())
+		{
+			localmap_[current_id]->Update(1, data[i].z);
+		}
+		else
+		{
+			localmap_[current_id] = new Cell(1, data[i].z);
+		}
+		//AddOnePoint2Localmap(data[i].x, data[i].y, data[i].z);
+	}
+	for (auto &lm : localmap_)
+	{
+		cellDataset_[lm.first] = lm.second;
+		road_ids.insert(lm.first);
+		cell_olds[current_old++] = lm.first;
+	}
+	localnew_id_.clear();
+	return 2;
+}
+
+int Map::Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds)
+{
+	std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> data = clouds->points;
+	std::map<int, Cell *> temp_localmap_;
+	for (unsigned int i = 0; i < data.size(); i++)
+	{
+		int current_id = Corrd2Id(data[i].x, data[i].y, data[i].z);
+		if (localmap_.find(current_id) != localmap_.end())
+		{
+			localmap_[current_id]->Update(1, data[i].z);
+			//temp_localmap_[current_id] = localmap_[current_id];
+		}
+		else
+		{
+			localmap_[current_id] = new Cell(1, data[i].z);
+			localnew_id_.insert(current_id);
+			//temp_localmap_[current_id] = localmap_[current_id];
+			cell_olds[current_old++] = current_id;
+		}
+		//AddOnePoint2Localmap(data[i].x, data[i].y, data[i].z);
+		//localmap_ = temp_localmap_;
+	}
+	return 0;
+}
+void Map::Add2Globalmap()
+{
+	for (auto &lm : localnew_id_)
+	{
+		cellDataset_[lm] = localmap_[lm];
+		road_ids.insert(lm);
+		// if (!cellDataset_[lm])
+		// {
+		// 	cellDataset_[lm] = localmap_[lm];
+		// 	road_ids.insert(lm);
+		// }
+		// else
+		// {
+		// 	cellDataset_[lm]->Update(1, localmap_[lm]->GetZ(1));
+		// 	delete localmap_[lm];
+		// 	localmap_[lm] = cellDataset_[lm];
+		// }
+	}
+	localnew_id_.clear();
+	if (cell_olds.size() > localmap_size_)
+	{
+		int sum = cell_olds.size() - localmap_size_;
+		std::map<int, int>::iterator itr = cell_olds.begin();
+		for (int i = 0; i < sum; i++)
+		{
+			localmap_.erase(itr->second);
+			cell_olds.erase(itr++);
+		}
+	}
+}
+pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_localMap()
+{
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_vis(new pcl::PointCloud<pcl::PointXYZ>);
+	std::map<int, Cell *>::iterator iter = localmap_.begin();
+	while (iter != localmap_.end())
+	{
+		/* code */
+		std::vector<float> current_ground_point = Id2Corrd(iter->first);
+		pcl::PointXYZ pt;
+		pt.x = current_ground_point[0];
+		pt.y = current_ground_point[1];
+		pt.z = current_ground_point[2];
+
+		cloud_vis->push_back(pt);
+		iter++;
+	}
+	return cloud_vis;
+}
+void Map::SetPose(Attitude pose)
+{
+	pose_ = pose;
+}
+void Map::SetInitFlag(int flag)
+{
+	InitializeFromScratch_ = 1;
 }

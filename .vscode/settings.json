@@ -59,6 +59,8 @@
         "memory_resource": "cpp",
         "optional": "cpp",
         "set": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "core": "cpp",
+        "numericaldiff": "cpp"
     }
 }

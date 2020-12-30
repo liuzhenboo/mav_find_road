@@ -10,8 +10,8 @@ Cell::Cell(uint8_t class_state, float current_height)
 	seen_times = 0;
 	obs_seentimes = 0;
 	ground_seentimes = 0;
-	obs_height = 0;
-	ground_height = 0;
+	obs_height = 2;
+	ground_height = 2;
 	Update(class_state, current_height);
 }
 Cell::~Cell()
@@ -24,17 +24,21 @@ uint8_t Cell::Update(uint8_t class_state, float current_height)
 	// 更新格子状态
 	if (class_state == 1)
 	{
-		ground_height = (current_height + ground_height * ground_seentimes) / (1.0 * (++ground_seentimes));
+		//ground_height = (current_height + ground_height * ground_seentimes) / (1.0 * (++ground_seentimes));
+		ground_height = (1.0 * current_height + 0.0 * ground_height);
+		ground_seentimes++;
 	}
 	else if (class_state == 2)
 	{
-		obs_height = (current_height + obs_height * obs_seentimes) / (1.0 * (++obs_seentimes));
+		//obs_height = (current_height + obs_height * obs_seentimes) / (1.0 * (++obs_seentimes));
+		obs_height = (0.5 * current_height + 0.5 * obs_height);
+		obs_seentimes++;
 	}
-	if (obs_seentimes >= 5)
+	if (obs_seentimes >= 10)
 	{
 		fusion_id = 2;
 	}
-	else if (ground_seentimes >= 1)
+	else if (ground_seentimes >= 20)
 	{
 		fusion_id = 1;
 	}
@@ -43,6 +47,7 @@ uint8_t Cell::Update(uint8_t class_state, float current_height)
 		fusion_id = 3;
 	}
 	state = fusion_id;
+	//std::cout << state << std::endl;
 	return fusion_id;
 }
 float Cell::GetZ(int id)
@@ -56,5 +61,5 @@ float Cell::GetZ(int id)
 		return obs_height;
 	}
 
-	return 0;
+	return ground_height;
 }
