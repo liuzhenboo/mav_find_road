@@ -135,14 +135,17 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_cellMap()
 	std::set<int>::iterator iter = road_ids.begin();
 	while (iter != road_ids.end())
 	{
-		/* code */
-		std::vector<float> current_ground_point = Id2Corrd(*iter);
-		pcl::PointXYZ pt;
-		pt.x = current_ground_point[0];
-		pt.y = current_ground_point[1];
-		pt.z = current_ground_point[2];
+		// 因为同一个格子上方的点云数目可能有多个，所以road_ids中可能存在obs_ids中的点．
+		if (cellDataset_[*iter]->GetState() == 1)
+		{
+			std::vector<float> current_ground_point = Id2Corrd(*iter);
+			pcl::PointXYZ pt;
+			pt.x = current_ground_point[0];
+			pt.y = current_ground_point[1];
+			pt.z = current_ground_point[2];
 
-		cloud_vis->push_back(pt);
+			cloud_vis->push_back(pt);
+		}
 		iter++;
 	}
 	return cloud_vis;
@@ -343,6 +346,8 @@ int Map::Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl::Poi
 		int current_id = Corrd2Id(data[i].x, data[i].y, data[i].z);
 		if (localmap_.find(current_id) != localmap_.end())
 		{
+			// 标志位判断在融合数据时候，当前的cell的状态是否变过，变化的方向是什么；
+			// 故，这里的 localupdate_id1_与localupdate_id２_的元素可能存在相同的值
 			int flag = localmap_[current_id]->GetState();
 			localmap_[current_id]->Update(1, data[i].z);
 			int flag1 = localmap_[current_id]->GetState();
@@ -428,12 +433,16 @@ void Map::Add2Globalmap()
 	}
 	for (auto &lm : localupdate_id1_)
 	{
+		// if (cellDataset_[lm]->GetState() != 2)
+		// 	std::cout << "wrong2" << std::endl;
 		road_ids.erase(lm);
 		obs_ids.insert(lm);
 	}
 	for (auto &lm : localupdate_id2_)
 	{
 		obs_ids.erase(lm);
+		// if (cellDataset_[lm]->GetState() != 1)
+		// 	std::cout << "wrong1" << std::endl;
 		road_ids.insert(lm);
 	}
 	localnew_id_.clear();
@@ -460,7 +469,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_localMap()
 	while (iter != localmap_.end())
 	{
 		// 显示时，局部地图不显示障碍物
-		//if (iter->second->GetState() != 2)
+		if (iter->second->GetState() != 2)
 		{
 			std::vector<float> current_ground_point = Id2Corrd(iter->first);
 			pcl::PointXYZ pt;
@@ -469,8 +478,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_localMap()
 			pt.z = current_ground_point[2];
 
 			cloud_vis->push_back(pt);
-			iter++;
 		}
+		iter++;
 	}
 	return cloud_vis;
 }
@@ -480,14 +489,16 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_obsMap()
 	std::set<int>::iterator iter = obs_ids.begin();
 	while (iter != obs_ids.end())
 	{
-		/* code */
-		std::vector<float> current_obs_point = Id2Corrd(*iter);
-		pcl::PointXYZ pt;
-		pt.x = current_obs_point[0];
-		pt.y = current_obs_point[1];
-		pt.z = current_obs_point[2];
+		if (cellDataset_[*iter]->GetState() == 2)
+		{
+			std::vector<float> current_obs_point = Id2Corrd(*iter);
+			pcl::PointXYZ pt;
+			pt.x = current_obs_point[0];
+			pt.y = current_obs_point[1];
+			pt.z = current_obs_point[2];
 
-		cloud_vis->push_back(pt);
+			cloud_vis->push_back(pt);
+		}
 		iter++;
 	}
 	return cloud_vis;

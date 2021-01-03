@@ -34,8 +34,20 @@ uint8_t Cell::Update(uint8_t class_state, float current_height)
 		obs_height = (1.0 * current_height + 0.0 * obs_height);
 		obs_seentimes++;
 	}
+
 	if (obs_seentimes >= 1)
 	{
+		// if (ground_seentimes >= 1)
+		// {
+		// 	if ((obs_height - ground_height) >= 1.0)
+		// 		fusion_id = 1;
+		// 	else
+		// 		fusion_id = 2;
+		// }
+		// else
+		// {
+		// 	fusion_id = 2;
+		// }
 		fusion_id = 2;
 	}
 	else if (ground_seentimes >= 1)
@@ -44,10 +56,10 @@ uint8_t Cell::Update(uint8_t class_state, float current_height)
 	}
 	else
 	{
+		std::cout << "发现状态为：３" << std::endl;
 		fusion_id = 3;
 	}
 	state = fusion_id;
-	//std::cout << state << std::endl;
 	return fusion_id;
 }
 float Cell::GetZ(int id)

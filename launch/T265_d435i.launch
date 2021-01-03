@@ -39,7 +39,7 @@
 			<param name="maxGroundHeight" type="double" value="-0.5"/>		
 			
 			<param name="min_region" type="double" value="1.0"/>		
-			<param name="localmap_size" type="int" value="3000"/>		
+			<param name="localmap_size" type="int" value="2000"/>		
 
 
   		</node>
