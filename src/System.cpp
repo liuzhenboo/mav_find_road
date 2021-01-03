@@ -57,6 +57,7 @@ void System::Init_parameter(ros::NodeHandle &nh)
 
 	obstaclesPub_ = nh.advertise<sensor_msgs::PointCloud2>("obstacles", 1);
 	projObstaclesPub_ = nh.advertise<sensor_msgs::PointCloud2>("proj_obstacles", 1);
+	unsurePub_ = nh.advertise<sensor_msgs::PointCloud2>("unsure", 1);
 
 	// 发布道路信息
 	//.......
@@ -272,10 +273,10 @@ void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
 	// 	obstaclesPub_.publish(rosCloud);
 	// }
 	ROS_DEBUG("road detect cost = %f s", (ros::WallTime::now() - time).toSec());
-	Sent2MapHandle(groundCloud);
+	Sent2MapHandle(groundCloud, obstaclesCloud);
 }
 
-void System::Sent2MapHandle(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud)
+void System::Sent2MapHandle(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud)
 {
 	ros::WallTime time1 = ros::WallTime::now();
 	// 融合当前道路点云
@@ -283,7 +284,7 @@ void System::Sent2MapHandle(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud)
 	// 初始化，丢失状态
 	if (system_status_ == 0)
 	{
-		system_status_ = map_.Initialization_Newground(groundCloud);
+		system_status_ = map_.Initialization_Newground(groundCloud, obstaclesCloud);
 		if (system_status_ == 1)
 		{
 			std::cout << "初始化成功！" << std::endl;
@@ -299,7 +300,7 @@ void System::Sent2MapHandle(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud)
 		// 跟踪成功
 		if (map_.Track(groundCloud))
 		{
-			map_.Fusion2Localmap(groundCloud);
+			map_.Fusion2Localmap(groundCloud, obstaclesCloud);
 			map_.Add2Globalmap();
 			std::cout << "fusion_cell" << std::endl;
 			vis_map();
@@ -312,6 +313,7 @@ void System::Sent2MapHandle(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud)
 		}
 	}
 	ROS_DEBUG("map fusion cost = %f s", (ros::WallTime::now() - time1).toSec());
+	obstaclesCloud_ = groundCloud;
 }
 
 void System::vis_map()
@@ -320,26 +322,39 @@ void System::vis_map()
 	{
 		sensor_msgs::PointCloud2 rosCloud;
 		sensor_msgs::PointCloud2 roslocalCloud;
+		sensor_msgs::PointCloud2 rosobsCloud;
+		sensor_msgs::PointCloud2 rosunsureCloud;
 
 		pcl::PointCloud<pcl::PointXYZ>::Ptr all_groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
 		pcl::PointCloud<pcl::PointXYZ>::Ptr local_groundCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		pcl::PointCloud<pcl::PointXYZ>::Ptr obsCloud(new pcl::PointCloud<pcl::PointXYZ>);
+		pcl::PointCloud<pcl::PointXYZ>::Ptr unsureCloud(new pcl::PointCloud<pcl::PointXYZ>);
 
 		//pcl::PointCloud<pcl::PointXYZRGB>::Ptr all_groundCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 
 		//all_groundCloud = map_.get_allmap();
 		all_groundCloud = map_.get_cellMap();
 		local_groundCloud = map_.get_localMap();
+		obsCloud = map_.get_obsMap();
+		unsureCloud = map_.get_unsureMap();
 
 		pcl::toROSMsg(*all_groundCloud, rosCloud);
 		pcl::toROSMsg(*local_groundCloud, roslocalCloud);
+		pcl::toROSMsg(*obsCloud, rosobsCloud);
+		pcl::toROSMsg(*obstaclesCloud_, rosunsureCloud);
 
 		//rosCloud.header = cloudMsg->header;
 		//rosCloud.header.stamp = cloudMsg_->header.stamp;
 		rosCloud.header.frame_id = mapFrameId_;
 		roslocalCloud.header.frame_id = mapFrameId_;
+		rosobsCloud.header.frame_id = mapFrameId_;
+		rosunsureCloud.header.frame_id = mapFrameId_;
+
 		//publish the message
 		groundPub_.publish(rosCloud);
 		localgroundPub_.publish(roslocalCloud);
+		obstaclesPub_.publish(rosobsCloud);
+		unsurePub_.publish(rosunsureCloud);
 	}
 	// map_.fusion_cell(obstaclesCloud, 2);
 

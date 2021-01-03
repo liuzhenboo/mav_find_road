@@ -24,7 +24,7 @@ public:
 	void Init_parameter(ros::NodeHandle &);
 	void run();
 	void vis_map();
-	void Sent2MapHandle(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud);
+	void Sent2MapHandle(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud);
 
 private:
 	std::string frameId_;
@@ -43,6 +43,7 @@ private:
 	ros::Publisher groundPub_;
 	ros::Publisher localgroundPub_;
 	ros::Publisher obstaclesPub_;
+	ros::Publisher unsurePub_;
 	ros::Publisher projObstaclesPub_;
 
 	ros::Subscriber cloudSub_;
@@ -54,4 +55,5 @@ private:
 
 	const sensor_msgs::PointCloud2ConstPtr cloudMsg_;
 	Attitude pose_;
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud_;
 };

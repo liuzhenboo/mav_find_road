@@ -195,13 +195,13 @@ void Map::init(ros::NodeHandle &nh)
 
 	nh.param("localmap_size", localmap_size_, localmap_size_);
 }
-int Map::Initialization_Newground(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds)
+int Map::Initialization_Newground(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud)
 {
 	// 已经开始初始化,初始化正在进行时．．．
 	if (!InitializeFromScratch_)
 	{
 		// fusion localmap
-		return Init_Clouds2Localmap(clouds, InitializeFromScratch_);
+		return Init_Clouds2Localmap(clouds, obstaclesCloud, InitializeFromScratch_);
 	}
 	else
 	// 正在开始初始化
@@ -209,11 +209,12 @@ int Map::Initialization_Newground(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds)
 		// clean localmap,start new ...
 		localmap_.clear();
 		localnew_id_.clear();
-		return Init_Clouds2Localmap(clouds, InitializeFromScratch_);
+		return Init_Clouds2Localmap(clouds, obstaclesCloud, InitializeFromScratch_);
 	}
 }
 int Map::Track(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud)
 {
+	return 1;
 	int id = Corrd2Id(pose_.x(), pose_.y(), pose_.z());
 	if (obs_ids.find(id) != obs_ids.end())
 	{
@@ -240,7 +241,7 @@ int Map::Track(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud)
 	}
 	return 0;
 }
-int Map::Init_Clouds2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, int InitializeFromScratch)
+int Map::Init_Clouds2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud, int InitializeFromScratch)
 {
 	if (InitializeFromScratch)
 	{
@@ -251,12 +252,19 @@ int Map::Init_Clouds2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, int
 			localmap_[current_id] = new Cell(1, data[i].z);
 			//AddOnePoint2Localmap(data[i].x, data[i].y, data[i].z);
 		}
+		std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> obstaclesdata = obstaclesCloud->points;
+		for (unsigned int i = 0; i < obstaclesdata.size(); i++)
+		{
+			int current_id = Corrd2Id(obstaclesdata[i].x, obstaclesdata[i].y, obstaclesdata[i].z);
+			localmap_[current_id] = new Cell(2, obstaclesdata[i].z);
+			//AddOnePoint2Localmap(data[i].x, data[i].y, data[i].z);
+		}
 		InitializeFromScratch_ = 0;
 		return 0;
 	}
 	else
 	{
-		int flag = Init_Fusion2Localmap(clouds);
+		int flag = Init_Fusion2Localmap(clouds, obstaclesCloud);
 		if (flag == 0) //初始化失败
 		{
 			InitializeFromScratch_ = 1;
@@ -270,10 +278,12 @@ int Map::Init_Clouds2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, int
 			return 1;
 	}
 }
-int Map::Init_Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds)
+int Map::Init_Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud)
 {
 	// TODO...
 	std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> data = clouds->points;
+	std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> obstaclesdata = obstaclesCloud->points;
+
 	for (unsigned int i = 0; i < data.size(); i++)
 	{
 		int current_id = Corrd2Id(data[i].x, data[i].y, data[i].z);
@@ -287,31 +297,96 @@ int Map::Init_Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds)
 		}
 		//AddOnePoint2Localmap(data[i].x, data[i].y, data[i].z);
 	}
+	for (unsigned int i = 0; i < obstaclesdata.size(); i++)
+	{
+		int current_id = Corrd2Id(obstaclesdata[i].x, obstaclesdata[i].y, obstaclesdata[i].z);
+		if (localmap_.find(current_id) != localmap_.end())
+		{
+			localmap_[current_id]->Update(2, data[i].z);
+		}
+		else
+		{
+			localmap_[current_id] = new Cell(2, data[i].z);
+		}
+		//AddOnePoint2Localmap(data[i].x, data[i].y, data[i].z);
+	}
 	for (auto &lm : localmap_)
 	{
 		cellDataset_[lm.first] = lm.second;
-		road_ids.insert(lm.first);
+		if (lm.second->GetState() == 1)
+		{
+			road_ids.insert(lm.first);
+		}
+		else if (lm.second->GetState() == 2)
+		{
+			obs_ids.insert(lm.first);
+		}
+		else
+		{
+			//unsure_ids.insert(lm.first);
+		}
+
 		cell_olds[current_old++] = lm.first;
 	}
 	localnew_id_.clear();
 	return 2;
 }
 
-int Map::Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds)
+int Map::Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud)
 {
 	std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> data = clouds->points;
-	std::map<int, Cell *> temp_localmap_;
+	std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> obstaclesdata = obstaclesCloud->points;
+
+	//std::map<int, Cell *> temp_localmap_;
 	for (unsigned int i = 0; i < data.size(); i++)
 	{
 		int current_id = Corrd2Id(data[i].x, data[i].y, data[i].z);
 		if (localmap_.find(current_id) != localmap_.end())
 		{
+			int flag = localmap_[current_id]->GetState();
 			localmap_[current_id]->Update(1, data[i].z);
+			int flag1 = localmap_[current_id]->GetState();
+			if (flag == 1 && flag1 == 2)
+			{
+				localupdate_id1_.insert(current_id);
+			}
+			else if (flag == 2 && flag1 == 1)
+			{
+				localupdate_id2_.insert(current_id);
+			}
 			//temp_localmap_[current_id] = localmap_[current_id];
 		}
 		else
 		{
 			localmap_[current_id] = new Cell(1, data[i].z);
+			localnew_id_.insert(current_id);
+			//temp_localmap_[current_id] = localmap_[current_id];
+			cell_olds[current_old++] = current_id;
+		}
+		//AddOnePoint2Localmap(data[i].x, data[i].y, data[i].z);
+		//localmap_ = temp_localmap_;
+	}
+	for (unsigned int i = 0; i < obstaclesdata.size(); i++)
+	{
+		int current_id = Corrd2Id(obstaclesdata[i].x, obstaclesdata[i].y, obstaclesdata[i].z);
+		if (localmap_.find(current_id) != localmap_.end())
+		{
+			int flag = localmap_[current_id]->GetState();
+			localmap_[current_id]->Update(2, obstaclesdata[i].z);
+			int flag1 = localmap_[current_id]->GetState();
+			//temp_localmap_[current_id] = localmap_[current_id];
+			if (flag == 1 && flag1 == 2)
+			{
+				localupdate_id1_.insert(current_id);
+			}
+			else if (flag == 2 && flag1 == 1)
+			{
+				localupdate_id2_.insert(current_id);
+			}
+		}
+		else
+		{
+			localmap_[current_id] = new Cell(2, obstaclesdata[i].z);
 			localnew_id_.insert(current_id);
 			//temp_localmap_[current_id] = localmap_[current_id];
 			cell_olds[current_old++] = current_id;
@@ -326,7 +401,19 @@ void Map::Add2Globalmap()
 	for (auto &lm : localnew_id_)
 	{
 		cellDataset_[lm] = localmap_[lm];
-		road_ids.insert(lm);
+		if (localmap_[lm]->GetState() == 1)
+		{
+			road_ids.insert(lm);
+		}
+		else if (localmap_[lm]->GetState() == 2)
+		{
+			obs_ids.insert(lm);
+		}
+		else
+		{
+			//unsure_ids.insert(lm);
+		}
+
 		// if (!cellDataset_[lm])
 		// {
 		// 	cellDataset_[lm] = localmap_[lm];
@@ -339,13 +426,28 @@ void Map::Add2Globalmap()
 		// 	localmap_[lm] = cellDataset_[lm];
 		// }
 	}
+	for (auto &lm : localupdate_id1_)
+	{
+		road_ids.erase(lm);
+		obs_ids.insert(lm);
+	}
+	for (auto &lm : localupdate_id2_)
+	{
+		obs_ids.erase(lm);
+		road_ids.insert(lm);
+	}
 	localnew_id_.clear();
+	localupdate_id1_.clear();
+	localupdate_id2_.clear();
+
 	if (cell_olds.size() > localmap_size_)
 	{
 		int sum = cell_olds.size() - localmap_size_;
 		std::map<int, int>::iterator itr = cell_olds.begin();
 		for (int i = 0; i < sum; i++)
 		{
+			// if (localmap_[itr->second]->GetState() == 2)
+			// 	unsure_ids.insert(itr->second);
 			localmap_.erase(itr->second);
 			cell_olds.erase(itr++);
 		}
@@ -357,12 +459,52 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_localMap()
 	std::map<int, Cell *>::iterator iter = localmap_.begin();
 	while (iter != localmap_.end())
 	{
+		// 显示时，局部地图不显示障碍物
+		//if (iter->second->GetState() != 2)
+		{
+			std::vector<float> current_ground_point = Id2Corrd(iter->first);
+			pcl::PointXYZ pt;
+			pt.x = current_ground_point[0];
+			pt.y = current_ground_point[1];
+			pt.z = current_ground_point[2];
+
+			cloud_vis->push_back(pt);
+			iter++;
+		}
+	}
+	return cloud_vis;
+}
+pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_obsMap()
+{
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_vis(new pcl::PointCloud<pcl::PointXYZ>);
+	std::set<int>::iterator iter = obs_ids.begin();
+	while (iter != obs_ids.end())
+	{
 		/* code */
-		std::vector<float> current_ground_point = Id2Corrd(iter->first);
+		std::vector<float> current_obs_point = Id2Corrd(*iter);
 		pcl::PointXYZ pt;
-		pt.x = current_ground_point[0];
-		pt.y = current_ground_point[1];
-		pt.z = current_ground_point[2];
+		pt.x = current_obs_point[0];
+		pt.y = current_obs_point[1];
+		pt.z = current_obs_point[2];
+
+		cloud_vis->push_back(pt);
+		iter++;
+	}
+	return cloud_vis;
+}
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr Map::get_unsureMap()
+{
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_vis(new pcl::PointCloud<pcl::PointXYZ>);
+	std::set<int>::iterator iter = unsure_ids.begin();
+	while (iter != unsure_ids.end())
+	{
+		/* code */
+		std::vector<float> current_unsure_point = Id2Corrd(*iter);
+		pcl::PointXYZ pt;
+		pt.x = current_unsure_point[0];
+		pt.y = current_unsure_point[1];
+		pt.z = current_unsure_point[2];
 
 		cloud_vis->push_back(pt);
 		iter++;

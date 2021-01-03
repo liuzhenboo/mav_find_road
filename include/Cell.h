@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iostream>
 class Cell
 {
 public:
@@ -7,6 +8,7 @@ public:
     ~Cell();
     uint8_t Update(uint8_t class_state, float current_height);
     float GetZ(int id);
+    uint8_t GetState();
 
 private:
     // 格子的类别，０表示未探索，１表示是路，２表示是障碍物，３表示不确定

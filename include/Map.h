@@ -41,14 +41,16 @@ public:
 	int Corrd2Id(float x, float y, float z);
 	std::vector<float> Id2Corrd(int id);
 
-	int Initialization_Newground(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds);
+	int Initialization_Newground(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud);
 	int Track(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud);
-	int Init_Clouds2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, int Initializing);
-	int Init_Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds);
-	int Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds);
+	int Init_Clouds2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud, int Initializing);
+	int Init_Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud);
+	int Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud);
 	void Add2Globalmap();
 	void SetPose(Attitude pose);
 	void SetInitFlag(int flag);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr get_obsMap();
+	pcl::PointCloud<pcl::PointXYZ>::Ptr get_unsureMap();
 
 private:
 	// 点云　fusion
@@ -57,6 +59,7 @@ private:
 	// 方格fusion
 	std::vector<Cell *> cellDataset_;
 
+	//global map
 	std::set<int> road_ids;
 	std::set<int> obs_ids;
 	std::set<int> unsure_ids;
@@ -64,6 +67,8 @@ private:
 	// local map
 	std::map<int, Cell *> localmap_;
 	std::set<int> localnew_id_;
+	std::set<int> localupdate_id1_;
+	std::set<int> localupdate_id2_;
 	int InitializeFromScratch_;
 	std::map<int, int> cell_olds;
 	int current_old;

@@ -31,14 +31,14 @@ uint8_t Cell::Update(uint8_t class_state, float current_height)
 	else if (class_state == 2)
 	{
 		//obs_height = (current_height + obs_height * obs_seentimes) / (1.0 * (++obs_seentimes));
-		obs_height = (0.5 * current_height + 0.5 * obs_height);
+		obs_height = (1.0 * current_height + 0.0 * obs_height);
 		obs_seentimes++;
 	}
-	if (obs_seentimes >= 10)
+	if (obs_seentimes >= 1)
 	{
 		fusion_id = 2;
 	}
-	else if (ground_seentimes >= 20)
+	else if (ground_seentimes >= 1)
 	{
 		fusion_id = 1;
 	}
@@ -60,6 +60,10 @@ float Cell::GetZ(int id)
 	{
 		return obs_height;
 	}
-
-	return ground_height;
+	std::cout << "debug" << std::endl;
+	return obs_height;
+}
+uint8_t Cell::GetState()
+{
+	return state;
 }

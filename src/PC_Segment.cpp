@@ -296,7 +296,7 @@ void PC_Segment::segmentObstaclesFromGround(
 				if (maxGroundHeight == 0.0f || min[2] < maxGroundHeight)
 				{
 					// 是否只要最大的聚类平面．
-					if (true)
+					if (false)
 					{
 						for (unsigned int i = 0; i < clusteredFlatSurfaces.size(); ++i)
 						{
