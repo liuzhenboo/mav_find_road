@@ -15,4 +15,10 @@
 
 ## 结果展示
 
-![image](https://github.com/lexsaints/powershell/blob/master/IMG/ps2.png)
+![image01](https://github.com/liuzhenboo/mav_find_road/blob/master/img/01.png)
+
+![image02](https://github.com/liuzhenboo/mav_find_road/blob/master/img/02.png)
+
+![image03](https://github.com/liuzhenboo/mav_find_road/blob/master/img/03.png)
+
+![image04](https://github.com/liuzhenboo/mav_find_road/blob/master/img/04.png)
