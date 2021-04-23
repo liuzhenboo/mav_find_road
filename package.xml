@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <package>
   <name>mav_find_road</name>
-  <version>0.0.1</version>
+  <version>0.0.4</version>
   <description>liuzhenbo.</description>
-  <maintainer email="451014254@qq.com">liuzhenbo</maintainer>
+  <maintainer email="2746443306@qq.com">liuzhenbo</maintainer>
   <author>liuzhenbo</author>
   <license>BSD</license>
   <url type="bugtracker">https://github.com/introlab/rtabmap_ros/issues</url>
