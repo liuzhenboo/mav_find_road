@@ -57,24 +57,24 @@ private:
 	float footprintLength_ = 0.0;
 	float footprintWidth_ = 0.0;
 	float footprintHeight_ = 0.0;
-	float minGroundHeight_ = 0.0;
+	float minGroundHeight_ = -3.0;
+	float maxGroundHeight_ = 3.0;
 	float maxObstacleHeight_ = 2.0;
 	float maxGroundAngle_ = 0.785;
 	float clusterRadius_ = 0.1;
 	float noiseFilteringRadius_;
-	float maxGroundHeight_ = 0.0;
 
 	// double
 	double cellSize = 0.04;
 	double footprintLength = 0.0;
 	double footprintWidth = 0.0;
 	double footprintHeight = 0.0;
-	double minGroundHeight = 0.0;
+	double minGroundHeight = -3.0;
+	double maxGroundHeight = 3.0;
 	double maxObstacleHeight = 2.0;
 	double maxGroundAngle = 0.785;
 	double clusterRadius = 0.1;
 	double noiseFilteringRadius;
-	double maxGroundHeight = 0.0;
 
 	// new parameter
 	double _min_region = 2.0;

@@ -8,7 +8,8 @@ PC_Segment::PC_Segment()
 	footprintLength_ = 0.0;
 	footprintWidth_ = 0.0;
 	footprintHeight_ = 0.0;
-	minGroundHeight_ = 0.0;
+	minGroundHeight_ = -3.0;
+	maxGroundHeight_ = 3.0;
 	maxObstacleHeight_ = 2.0;
 	normalsSegmentation_ = true;
 	groundIsObstacle_ = false;
@@ -45,6 +46,8 @@ void PC_Segment::pc_init(ros::NodeHandle &nh)
 	nh.param("maxGroundHeight", maxGroundHeight, maxGroundHeight);
 	nh.param("maxGroundAngle", maxGroundAngle, maxGroundAngle);
 	nh.param("minGroundHeight", minGroundHeight, minGroundHeight);
+	nh.param("maxGroundHeight", maxGroundHeight, maxGroundHeight);
+
 	nh.param("clusterRadius", clusterRadius, clusterRadius);
 	nh.param("noiseFilteringRadius", noiseFilteringRadius, noiseFilteringRadius);
 	nh.param("maxObstacleHeight", maxObstacleHeight, maxObstacleHeight);
@@ -61,6 +64,7 @@ void PC_Segment::double2float()
 	footprintWidth_ = footprintWidth;
 	footprintHeight_ = footprintHeight;
 	minGroundHeight_ = minGroundHeight;
+	maxGroundHeight_ = maxGroundHeight;
 	maxObstacleHeight_ = maxObstacleHeight;
 	maxGroundAngle_ = maxGroundAngle;
 	clusterRadius_ = clusterRadius;
@@ -90,6 +94,7 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr PC_Segment::segmentCloud(
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 	pcl::IndicesPtr indices(new std::vector<int>);
 
+	// voxelize之后cloud与indice一一对应
 	if (preVoxelFiltering_)
 	{
 		// voxelize to grid cell size
@@ -123,32 +128,31 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr PC_Segment::segmentCloud(
 	pose.getEulerAngles(roll, pitch, yaw);
 	cloud = Utils_transform::transformPointCloud(cloud, Attitude(0, 0, projMapFrame_ ? pose.z() : 0, roll, pitch, 0));
 
-	// filter footprint
-	if (footprintLength_ > 0.0f || footprintWidth_ > 0.0f || footprintHeight_ > 0.0f)
-	{
-		indices = Utils_pcl::cropBox(
-			cloud,
-			indices,
-			Eigen::Vector4f(
-				footprintLength_ > 0.0f ? -footprintLength_ / 2.0f : std::numeric_limits<int>::min(),
-				footprintWidth_ > 0.0f && footprintLength_ > 0.0f ? -footprintWidth_ / 2.0f : std::numeric_limits<int>::min(),
-				0,
-				1),
-			Eigen::Vector4f(
-				footprintLength_ > 0.0f ? footprintLength_ / 2.0f : std::numeric_limits<int>::max(),
-				footprintWidth_ > 0.0f && footprintLength_ > 0.0f ? footprintWidth_ / 2.0f : std::numeric_limits<int>::max(),
-				footprintHeight_ > 0.0f && footprintLength_ > 0.0f && footprintWidth_ > 0.0f ? footprintHeight_ : std::numeric_limits<int>::max(),
-				1),
-			Attitude::getIdentity(), true);
-	}
+	// // filter footprint
+	// if (footprintLength_ > 0.0f || footprintWidth_ > 0.0f || footprintHeight_ > 0.0f)
+	// {
+	// 	indices = Utils_pcl::cropBox(
+	// 		cloud,
+	// 		indices,
+	// 		Eigen::Vector4f(
+	// 			footprintLength_ > 0.0f ? -footprintLength_ / 2.0f : std::numeric_limits<int>::min(),
+	// 			footprintWidth_ > 0.0f && footprintLength_ > 0.0f ? -footprintWidth_ / 2.0f : std::numeric_limits<int>::min(),
+	// 			0,
+	// 			1),
+	// 		Eigen::Vector4f(
+	// 			footprintLength_ > 0.0f ? footprintLength_ / 2.0f : std::numeric_limits<int>::max(),
+	// 			footprintWidth_ > 0.0f && footprintLength_ > 0.0f ? footprintWidth_ / 2.0f : std::numeric_limits<int>::max(),
+	// 			footprintHeight_ > 0.0f && footprintLength_ > 0.0f && footprintWidth_ > 0.0f ? footprintHeight_ : std::numeric_limits<int>::max(),
+	// 			1),
+	// 		Attitude::getIdentity(), true);
+	// }
 
-	/// 取得一定范围内点云的索引:indices
-	// filter ground/obstacles zone
-	if (minGroundHeight_ != 0.0f || maxObstacleHeight_ != 0.0f)
+	// 根据minGroundHeight_和maxGroundHeight_来更新indices，这时的indices是为了找路
+	if (minGroundHeight_ != 0.0f || maxGroundHeight_ != 0.0f)
 	{
 		indices = Utils_pcl::passThrough(cloud, indices, "z",
 										 minGroundHeight_ != 0.0f ? minGroundHeight_ : std::numeric_limits<int>::min(),
-										 maxObstacleHeight_ > 0.0f ? maxObstacleHeight_ : std::numeric_limits<int>::max());
+										 maxGroundHeight_ > 0.0f ? maxGroundHeight_ : std::numeric_limits<int>::max());
 		// UDEBUG("indices after max obstacles height filtering = %d", (int)indices->size());
 	}
 
@@ -343,16 +347,21 @@ void PC_Segment::segmentObstaclesFromGround(
 			if (indices->size())
 			{
 				// indices是满足法线要求的点云索引
-				notObstacles = Utils_pcl::extractIndices(cloud, indices, true);
-				notObstacles = Utils_pcl::concatenate(notObstacles, ground);
+				// notObstacles = Utils_pcl::extractIndices(cloud, indices, true);
+				// notObstacles = Utils_pcl::concatenate(notObstacles, ground);
 			}
 			// otherStuffIndices为去除地面之后的点云索引
 			pcl::IndicesPtr otherStuffIndices = Utils_pcl::extractIndices(cloud, notObstacles, true);
 
+			// 限制障碍物的最大高度
+			// if (maxObstacleHeight_ != 0.0f)
+			// {
+			// 	otherStuffIndices = Utils_pcl::passThrough(cloud, otherStuffIndices, "z", maxObstacleHeight_, std::numeric_limits<float>::max());
+			// }
 			// If ground height is set, remove obstacles under it
-			if (maxGroundHeight != 0.0f)
+			if (minGroundHeight_ != 0.0f || maxObstacleHeight_ != 0.0f)
 			{
-				otherStuffIndices = Utils_pcl::passThrough(cloud, otherStuffIndices, "z", maxGroundHeight, std::numeric_limits<float>::max());
+				otherStuffIndices = Utils_pcl::passThrough(cloud, otherStuffIndices, "z", minGroundHeight_, maxObstacleHeight_);
 			}
 
 			//Cluster remaining stuff (obstacles)
@@ -366,9 +375,9 @@ void PC_Segment::segmentObstaclesFromGround(
 					minClusterSize);
 				for (int k = 0; k < clusteredObstaclesSurfaces.size(); k++)
 				{
+					// 	TODO:障碍物判断
 					Eigen::Vector4f min, max;
 					pcl::getMinMax3D(*cloud, *clusteredObstaclesSurfaces.at(k), min, max);
-					// 	TODO:障碍物判断
 					if ((max[2] - min[2]) > 0.4)
 					{
 						big_clusteredObstaclesSurfaces.push_back(clusteredObstaclesSurfaces.at(k));

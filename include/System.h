@@ -14,6 +14,11 @@
 #include <boost/mpl/bind.hpp>
 #include <PC_Segment.h>
 #include <Map.h>
+#include <math.h>
+
+#define debug_rawground
+#define debug_rawobstacles
+#define debug_others
 
 class System
 {
@@ -24,7 +29,11 @@ public:
 	void Init_parameter(ros::NodeHandle &);
 	void run();
 	void vis_map();
-	void Sent2MapHandle(pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud);
+	void Sent2MapHandle(
+		pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud,
+		pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud,
+		pcl::PointCloud<pcl::PointXYZRGB>::Ptr othersCloud);
+	void Generate_waypoints();
 
 private:
 	std::string frameId_;
@@ -40,11 +49,21 @@ private:
 	double pointcloud_zd_ = -5.0;
 
 	int system_status_;
+
+	ros::Publisher rawgroundPub_;
+	ros::Publisher rawobstaclesPub_;
+	ros::Publisher rawothersPub_;
+
 	ros::Publisher groundPub_;
-	ros::Publisher localgroundPub_;
 	ros::Publisher obstaclesPub_;
-	ros::Publisher unsurePub_;
-	ros::Publisher projObstaclesPub_;
+	ros::Publisher othersPub_;
+
+	ros::Publisher localgroundPub_;
+	ros::Publisher localobstaclesPub_;
+	ros::Publisher localothersPub_;
+
+	ros::Publisher circlePub_;
+	ros::Publisher frontpointPub_;
 
 	ros::Subscriber cloudSub_;
 

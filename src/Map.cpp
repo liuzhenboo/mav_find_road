@@ -207,7 +207,6 @@ int Map::Initialization_Newground(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds,
 		return Init_Clouds2Localmap(clouds, obstaclesCloud, InitializeFromScratch_);
 	}
 	else
-	// 正在开始初始化
 	{
 		// clean localmap,start new ...
 		localmap_.clear();
@@ -268,22 +267,22 @@ int Map::Init_Clouds2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl
 	else
 	{
 		int flag = Init_Fusion2Localmap(clouds, obstaclesCloud);
-		if (flag == 0) //初始化失败
+		if (flag == 0) //连续性验证失败
 		{
 			InitializeFromScratch_ = 1;
 			return 0;
 		}
 		else if (flag == 1)
-			// 正在初始化还未完成
+			// 连续性验证成功，但是还未初始化完成
 			return 0;
 		else
 			//初始化成功
 			return 1;
 	}
 }
+// TODO:这里认为两次融合必定成功，没有做进一步细致的判断
 int Map::Init_Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud)
 {
-	// TODO...
 	std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> data = clouds->points;
 	std::vector<pcl::PointXYZRGB, Eigen::aligned_allocator<pcl::PointXYZRGB>> obstaclesdata = obstaclesCloud->points;
 
@@ -313,6 +312,8 @@ int Map::Init_Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl
 		}
 		//AddOnePoint2Localmap(data[i].x, data[i].y, data[i].z);
 	}
+
+	// 将局部地图的放入全局地图
 	for (auto &lm : localmap_)
 	{
 		cellDataset_[lm.first] = lm.second;
@@ -326,11 +327,10 @@ int Map::Init_Fusion2Localmap(pcl::PointCloud<pcl::PointXYZRGB>::Ptr clouds, pcl
 		}
 		else
 		{
-			//unsure_ids.insert(lm.first);
 		}
-
 		cell_olds[current_old++] = lm.first;
 	}
+
 	localnew_id_.clear();
 	return 2;
 }

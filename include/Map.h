@@ -62,6 +62,7 @@ private:
 	//global map
 	std::set<int> road_ids;
 	std::set<int> obs_ids;
+	//弃用
 	std::set<int> unsure_ids;
 
 	// local map
