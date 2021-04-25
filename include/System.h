@@ -15,10 +15,11 @@
 #include <PC_Segment.h>
 #include <Map.h>
 #include <math.h>
+#include <mutex>
 
-#define debug_rawground
-#define debug_rawobstacles
-#define debug_others
+// #define debug_rawground
+// #define debug_rawobstacles
+// #define debug_others
 
 class System
 {
@@ -26,6 +27,8 @@ public:
 	System();
 	~System();
 	void callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg);
+	void mappoints_callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg);
+
 	void Init_parameter(ros::NodeHandle &);
 	void run();
 	void vis_map();
@@ -33,7 +36,9 @@ public:
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud,
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud,
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr othersCloud);
-	void Generate_waypoints();
+	void Path_plan();
+	void Generate_waypoints(Eigen::Vector3f start, Eigen::Vector3f goal, std::vector<Eigen::Vector3f> &onepath);
+	int SelectBestWay(std::vector<std::vector<Eigen::Vector3f>> &waypoints);
 
 private:
 	std::string frameId_;
@@ -64,8 +69,11 @@ private:
 
 	ros::Publisher circlePub_;
 	ros::Publisher frontpointPub_;
+	ros::Publisher pointwaysPub_;
+	ros::Publisher bestwayPub_;
 
 	ros::Subscriber cloudSub_;
+	ros::Subscriber local_mappointsSub_;
 
 	// 点云切割器
 	PC_Segment PC_Processor_;
@@ -75,4 +83,9 @@ private:
 	const sensor_msgs::PointCloud2ConstPtr cloudMsg_;
 	Attitude pose_;
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstaclesCloud_;
+
+	// 局部地图点（特征点）
+
+	std::mutex Mutex_local_mappoints;
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr local_mappoints;
 };

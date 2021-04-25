@@ -61,6 +61,8 @@
         "set": "cpp",
         "string": "cpp",
         "core": "cpp",
-        "numericaldiff": "cpp"
+        "numericaldiff": "cpp",
+        "mutex": "cpp",
+        "condition_variable": "cpp"
     }
 }

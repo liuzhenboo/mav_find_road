@@ -48,8 +48,10 @@ void System::Init_parameter(ros::NodeHandle &nh)
 	std::cout << b << std::endl;
 	ROS_INFO("Starting...");
 
-	// 需要订阅点云数据
-	cloudSub_ = nh.subscribe<sensor_msgs::PointCloud2>("/camera/depth/color/points", 1, boost::bind(&System::callback, this, _1));
+	// 需要订阅传感器原始点云数据
+	cloudSub_ = nh.subscribe<sensor_msgs::PointCloud2>("/camera/depth/color/points", 2, boost::bind(&System::callback, this, _1));
+	// 需要订阅SLAM系统的局部地图点
+	local_mappointsSub_ = nh.subscribe<sensor_msgs::PointCloud2>("/orbslam3/local_mappoints", 2, boost::bind(&System::mappoints_callback, this, _1));
 
 	// 点云分割的结果，发布道路与障碍物点云，debug
 	rawgroundPub_ = nh.advertise<sensor_msgs::PointCloud2>("raw_ground", 1);
@@ -66,8 +68,10 @@ void System::Init_parameter(ros::NodeHandle &nh)
 	localothersPub_ = nh.advertise<sensor_msgs::PointCloud2>("localothers", 1);
 
 	// 发布圆形范围
-	circlePub_ = nh.advertise<sensor_msgs::PointCloud2>("circle", 1);
-	frontpointPub_ = nh.advertise<sensor_msgs::PointCloud2>("frontpoint", 1);
+	circlePub_ = nh.advertise<sensor_msgs::PointCloud2>("circle", 10);
+	frontpointPub_ = nh.advertise<sensor_msgs::PointCloud2>("frontpoint", 10);
+	pointwaysPub_ = nh.advertise<sensor_msgs::PointCloud2>("pointways", 10);
+	bestwayPub_ = nh.advertise<sensor_msgs::PointCloud2>("bestway", 10);
 }
 
 void System::run()
@@ -79,6 +83,17 @@ void System::run()
 		ros::spinOnce();
 		status = ros::ok();
 		rate.sleep();
+	}
+}
+
+void System::mappoints_callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
+{
+
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+	pcl::fromROSMsg(*cloudMsg, *inputCloud);
+	{
+		std::unique_lock<std::mutex> lock(Mutex_local_mappoints);
+		local_mappoints = inputCloud;
 	}
 }
 void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
@@ -301,9 +316,9 @@ void System::callback(const sensor_msgs::PointCloud2ConstPtr &cloudMsg)
 	ROS_DEBUG("road detect cost = %f s", (ros::WallTime::now() - time).toSec());
 	Sent2MapHandle(groundCloud, obstaclesCloud, othersCloud);
 
-	Generate_waypoints();
+	Path_plan();
 }
-void System::Generate_waypoints()
+void System::Path_plan()
 {
 	float x = pose_.x();
 	float y = pose_.y();
@@ -314,14 +329,14 @@ void System::Generate_waypoints()
 	for (int k = 0; k < sum; k++)
 	{
 		pcl::PointXYZ pt_inf;
-		pt_inf.x = x + r * std::cos((2 * M_PI / sum) * k);
-		pt_inf.y = y + r * std::sin((2 * M_PI / sum) * k);
-		pt_inf.z = z;
+		// pt_inf.x = x + r * std::cos((2 * M_PI / sum) * k);
+		// pt_inf.y = y + r * std::sin((2 * M_PI / sum) * k);
+		// pt_inf.z = z;
 		// 心型线
 		// TODO:各种形状来玩耍啊！
-		// pt_inf.x = x + r * (2.0 * std::cos((2 * M_PI / sum) * k) - std::cos((2 * M_PI / sum) * 2 * k));
-		// pt_inf.y = y + r * (2.0 * std::sin((2 * M_PI / sum) * k) - std::sin((2 * M_PI / sum) * 2 * k));
-		// pt_inf.z = z;
+		pt_inf.x = x + r * (2.0 * std::cos((2 * M_PI / sum) * k) - std::cos((2 * M_PI / sum) * 2 * k));
+		pt_inf.y = y + r * (2.0 * std::sin((2 * M_PI / sum) * k) - std::sin((2 * M_PI / sum) * 2 * k));
+		pt_inf.z = z;
 		cloud_vis.points.push_back(pt_inf);
 	}
 	sensor_msgs::PointCloud2 map_vis;
@@ -349,7 +364,7 @@ void System::Generate_waypoints()
 	pcl::toROSMsg(cloud_vis1, map_vis1);
 	map_vis1.header.frame_id = mapFrameId_;
 
-	frontpointPub_.publish(map_vis1);
+	//frontpointPub_.publish(map_vis1);
 
 	// 开始生成航路点
 	//在120度的视角下，每15度做一个目标点，共可以得到9条路线
@@ -358,7 +373,65 @@ void System::Generate_waypoints()
 	std::vector<std::vector<Eigen::Vector3f>> waypoints(way_count);
 	for (size_t i = 0; i < way_count; i++)
 	{
-		Eigen::Vector3f goal(x, y, z);
+		float x_g = x + r * std::cos(yaw - M_PI * 1.0 / 3.0 + i * M_PI * 2.0 / (3.0 * way_count));
+		float y_g = y + r * std::sin(yaw - M_PI * 1.0 / 3.0 + i * M_PI * 2.0 / (3.0 * way_count));
+		float z_g = z;
+		Eigen::Vector3f goal(x_g, y_g, z_g);
+		Generate_waypoints(start, goal, waypoints[i]);
+	}
+
+	// path可视化
+	pcl::PointCloud<pcl::PointXYZ> cloud_vis2;
+	sum = waypoints.size();
+	for (int j = 0; j < sum; j++)
+	{
+		for (int j1 = 0; j1 < waypoints[j].size(); j1++)
+		{
+			pcl::PointXYZ pt_inf;
+			pt_inf.x = waypoints[j][j1](0);
+			pt_inf.y = waypoints[j][j1](1);
+			pt_inf.z = waypoints[j][j1](2);
+			cloud_vis2.points.push_back(pt_inf);
+		}
+	}
+	sensor_msgs::PointCloud2 map_vis2;
+	pcl::toROSMsg(cloud_vis2, map_vis2);
+	map_vis2.header.frame_id = mapFrameId_;
+
+	//pointwaysPub_.publish(map_vis2);
+
+	// 选择最好的路径
+	int id = SelectBestWay(waypoints);
+	pcl::PointCloud<pcl::PointXYZ> cloud_vis3;
+	for (int j = 0; j < waypoints[id].size(); j++)
+	{
+		pcl::PointXYZ pt_inf;
+		pt_inf.x = waypoints[id][j](0);
+		pt_inf.y = waypoints[id][j](1);
+		pt_inf.z = waypoints[id][j](2);
+		cloud_vis3.points.push_back(pt_inf);
+	}
+	sensor_msgs::PointCloud2 map_vis3;
+	pcl::toROSMsg(cloud_vis3, map_vis3);
+	map_vis3.header.frame_id = mapFrameId_;
+
+	//bestwayPub_.publish(map_vis3);
+}
+
+// TODO:路径评判函数
+int System::SelectBestWay(std::vector<std::vector<Eigen::Vector3f>> &waypoints)
+{
+	return 2;
+}
+void System::Generate_waypoints(Eigen::Vector3f start, Eigen::Vector3f goal, std::vector<Eigen::Vector3f> &onepath)
+{
+	float x = goal(0) - start(0);
+	float y = goal(1) - start(1);
+	size_t sum = 30;
+	for (size_t i = 0; i < sum; i++)
+	{
+		Eigen::Vector3f temp((start(0) + x * i / sum), (start(1) + y * i / sum), start(2));
+		onepath.push_back(temp);
 	}
 }
 void System::Sent2MapHandle(
