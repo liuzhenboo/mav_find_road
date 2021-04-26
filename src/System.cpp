@@ -329,16 +329,17 @@ void System::Path_plan()
 	for (int k = 0; k < sum; k++)
 	{
 		pcl::PointXYZ pt_inf;
-		// pt_inf.x = x + r * std::cos((2 * M_PI / sum) * k);
-		// pt_inf.y = y + r * std::sin((2 * M_PI / sum) * k);
-		// pt_inf.z = z;
+		pt_inf.x = x + r * std::cos((2 * M_PI / sum) * k);
+		pt_inf.y = y + r * std::sin((2 * M_PI / sum) * k);
+		pt_inf.z = z;
 		// 心型线
 		// TODO:各种形状来玩耍啊！
-		pt_inf.x = x + r * (2.0 * std::cos((2 * M_PI / sum) * k) - std::cos((2 * M_PI / sum) * 2 * k));
-		pt_inf.y = y + r * (2.0 * std::sin((2 * M_PI / sum) * k) - std::sin((2 * M_PI / sum) * 2 * k));
-		pt_inf.z = z;
+		// pt_inf.x = x + r * (2.0 * std::cos((2 * M_PI / sum) * k) - std::cos((2 * M_PI / sum) * 2 * k));
+		// pt_inf.y = y + r * (2.0 * std::sin((2 * M_PI / sum) * k) - std::sin((2 * M_PI / sum) * 2 * k));
+		// pt_inf.z = z;
 		cloud_vis.points.push_back(pt_inf);
 	}
+
 	sensor_msgs::PointCloud2 map_vis;
 	pcl::toROSMsg(cloud_vis, map_vis);
 	map_vis.header.frame_id = mapFrameId_;
@@ -364,7 +365,7 @@ void System::Path_plan()
 	pcl::toROSMsg(cloud_vis1, map_vis1);
 	map_vis1.header.frame_id = mapFrameId_;
 
-	//frontpointPub_.publish(map_vis1);
+	frontpointPub_.publish(map_vis1);
 
 	// 开始生成航路点
 	//在120度的视角下，每15度做一个目标点，共可以得到9条路线
@@ -398,7 +399,7 @@ void System::Path_plan()
 	pcl::toROSMsg(cloud_vis2, map_vis2);
 	map_vis2.header.frame_id = mapFrameId_;
 
-	//pointwaysPub_.publish(map_vis2);
+	pointwaysPub_.publish(map_vis2);
 
 	// 选择最好的路径
 	int id = SelectBestWay(waypoints);
@@ -415,16 +416,25 @@ void System::Path_plan()
 	pcl::toROSMsg(cloud_vis3, map_vis3);
 	map_vis3.header.frame_id = mapFrameId_;
 
-	//bestwayPub_.publish(map_vis3);
+	bestwayPub_.publish(map_vis3);
 }
 
 // TODO:路径评判函数
 int System::SelectBestWay(std::vector<std::vector<Eigen::Vector3f>> &waypoints)
 {
+	// 根据orbslam3局部地图信息，选择路线
+	{
+		std::unique_lock<std::mutex> lock(Mutex_local_mappoints);
+
+		//local_mappoints;
+	}
+
 	return 2;
 }
+
 void System::Generate_waypoints(Eigen::Vector3f start, Eigen::Vector3f goal, std::vector<Eigen::Vector3f> &onepath)
 {
+	// 方案一：直线
 	float x = goal(0) - start(0);
 	float y = goal(1) - start(1);
 	size_t sum = 30;
@@ -433,6 +443,9 @@ void System::Generate_waypoints(Eigen::Vector3f start, Eigen::Vector3f goal, std
 		Eigen::Vector3f temp((start(0) + x * i / sum), (start(1) + y * i / sum), start(2));
 		onepath.push_back(temp);
 	}
+
+	// 方案二：考虑到障碍物以及行军道路信息
+	// TODO...
 }
 void System::Sent2MapHandle(
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud,
