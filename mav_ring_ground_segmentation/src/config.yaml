@@ -1,0 +1,19 @@
+%YAML:1.0
+camera_factor: 1000
+camera_cx: 321.798
+camera_cy: 239.607
+camera_fx: 615.899
+camera_fy: 616.468
+camera_f: 100
+ring_r: 0.5
+ring_R: 8.0
+ring_theta: 2.0
+ring_row: 20
+ring_col: 20
+min_obs: 0.2
+max_between_cell_high: 0.2
+edge_dilate_size: 11
+kenel_size: 11
+voxfile: 0.01
+col_percell: 4
+row_percell: 4

@@ -1,3 +1,5 @@
+This res contains the mapping and ground segmentation code, and the specific code for ground segmentation is in the folder：mav_ring_ground_segmentation.
+
 ## 丛林环境行军道路探测
 
 ### 指标要求

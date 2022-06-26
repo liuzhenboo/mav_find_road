@@ -1,0 +1,5 @@
+/media/lzb/Windows-SSD/ubuntu18/Master_Thesis/src/mav_ring_ground_segmentation/build/CMakeFiles/rebuild_cache.dir
+/media/lzb/Windows-SSD/ubuntu18/Master_Thesis/src/mav_ring_ground_segmentation/build/CMakeFiles/edit_cache.dir
+/media/lzb/Windows-SSD/ubuntu18/Master_Thesis/src/mav_ring_ground_segmentation/build/CMakeFiles/test.dir
+/media/lzb/Windows-SSD/ubuntu18/Master_Thesis/src/mav_ring_ground_segmentation/build/CMakeFiles/depth_extract_lib.dir
+/media/lzb/Windows-SSD/ubuntu18/Master_Thesis/src/mav_ring_ground_segmentation/build/CMakeFiles/depth_extract.dir
