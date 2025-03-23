@@ -1,8 +1,10 @@
+发表会议: (paper is not exactly same with code)
 
-发表会议：
 Liu, Zhenbo,Yi, Zhenhui,Cheng, Changwei. A Robust Ground Point Cloud Segmentation Algorithm Based on Region Growing in a Fan-shaped Grid Map[C]:Institute of Electrical and Electronics Engineers Inc.,2022:1359-1364.
 
-This res contains the mapping and ground segmentation code, and the specific code for ground segmentation is in the folder：mav_ring_ground_segmentation.
+If you use this for your academic research, please cite our related papers. bib
+
+the specific code for ground segmentation is in the folder：mav_ring_ground_segmentation.
 
 
 ## 丛林环境行军道路探测
