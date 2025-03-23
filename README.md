@@ -1,5 +1,8 @@
 This res contains the mapping and ground segmentation code, and the specific code for ground segmentation is in the folder：mav_ring_ground_segmentation.
 
+发表会议：
+Liu, Zhenbo,Yi, Zhenhui,Cheng, Changwei. A Robust Ground Point Cloud Segmentation Algorithm Based on Region Growing in a Fan-shaped Grid Map[C]:Institute of Electrical and Electronics Engineers Inc.,2022:1359-1364.
+
 ## 丛林环境行军道路探测
 
 ### 指标要求
