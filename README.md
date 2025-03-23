@@ -7,6 +7,7 @@ If you use this for your academic research, please cite our related papers. bib
 
 the specific code for ground segmentation is in the folder：mav_ring_ground_segmentation.
 
+文章下载地址：https://ieeexplore.ieee.org/document/10011824
 
 ## 丛林环境行军道路探测
 
